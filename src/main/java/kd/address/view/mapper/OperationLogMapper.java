@@ -3,6 +3,7 @@ package kd.address.view.mapper;
 import kd.address.view.entity.OperationLog;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
@@ -15,5 +16,5 @@ public interface OperationLogMapper {
     void insert(OperationLog log);
 
     @Select("SELECT * FROM operation_log ORDER BY id DESC LIMIT #{limit}")
-    List<OperationLog> findRecent(int limit);
+    List<OperationLog> findRecent(@Param("limit") int limit);
 }

@@ -1,7 +1,5 @@
 package kd.address.view.mapper;
 
-
-
 import kd.address.view.entity.Project;
 import org.apache.ibatis.annotations.*;
 
@@ -11,18 +9,18 @@ import java.util.List;
 public interface ProjectMapper {
 
     @Select("SELECT * FROM project WHERE category = #{category} ORDER BY id DESC")
-    List<Project> findByCategory(String category);
+    List<Project> findByCategory(@Param("category") String category);
 
     @Select("SELECT DISTINCT category FROM project ORDER BY category")
     List<String> findAllCategories();
 
     @Select("SELECT * FROM project WHERE id = #{id}")
-    Project findById(Long id);
+    Project findById(@Param("id") Long id);
 
     @Insert({
             "<script>",
-            "INSERT INTO project (project_name, short_name, platform_url, background_image, category, type, description,create_time)",
-            "VALUES (#{projectName}, #{shortName}, #{platformUrl}, #{backgroundImage}, #{category}, #{type}, #{description},now())",
+            "INSERT INTO project (project_name, short_name, platform_url, background_image, category, type, description, create_time)",
+            "VALUES (#{projectName}, #{shortName}, #{platformUrl}, #{backgroundImage}, #{category}, #{type}, #{description}, now())",
             "</script>"
     })
     @Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
@@ -45,5 +43,5 @@ public interface ProjectMapper {
     void update(Project project);
 
     @Delete("DELETE FROM project WHERE id = #{id}")
-    void deleteById(Long id);
+    void deleteById(@Param("id") Long id);
 }

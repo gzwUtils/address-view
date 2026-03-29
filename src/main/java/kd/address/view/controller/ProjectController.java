@@ -1,11 +1,13 @@
 package kd.address.view.controller;
+
+import kd.address.view.common.ApiResponse;
 import kd.address.view.dto.ProjectDTO;
 import kd.address.view.service.ProjectService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-@SuppressWarnings("unused")
+
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/projects")
@@ -14,22 +16,24 @@ public class ProjectController {
     private final ProjectService projectService;
 
     @GetMapping("/categories")
-    public List<String> getCategories() {
-        return projectService.getAllCategories();
+    public ApiResponse<List<String>> getCategories() {
+        return ApiResponse.success(projectService.getAllCategories());
     }
 
     @GetMapping
-    public List<ProjectDTO> getProjects(@RequestParam String category) {
-        return projectService.getProjectsByCategory(category);
+    public ApiResponse<List<ProjectDTO>> getProjects(@RequestParam String category) {
+        return ApiResponse.success(projectService.getProjectsByCategory(category));
     }
 
     @PostMapping
-    public void createProject(@RequestBody ProjectDTO project) {
+    public ApiResponse<Void> createProject(@RequestBody ProjectDTO project) {
         projectService.save(project);
+        return ApiResponse.success(null);
     }
 
     @DeleteMapping("/{id}")
-    public void deleteProject(@PathVariable Long id) {
+    public ApiResponse<Boolean> deleteProject(@PathVariable Long id) {
         projectService.deleteById(id);
+        return ApiResponse.success(Boolean.TRUE);
     }
 }

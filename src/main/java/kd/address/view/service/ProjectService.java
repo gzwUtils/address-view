@@ -4,12 +4,14 @@ import kd.address.view.dto.ProjectDTO;
 import kd.address.view.entity.Project;
 import kd.address.view.mapper.ProjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
+
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class ProjectService {
@@ -17,14 +19,13 @@ public class ProjectService {
     private final ProjectMapper projectMapper;
 
     public List<ProjectDTO> getProjectsByCategory(String category) {
-        List<Project> byCategory = projectMapper.findByCategory(category);
-        List<ProjectDTO> arrayList = new ArrayList<>(byCategory.size());
-        byCategory.forEach(project ->{
-            ProjectDTO projectDTO = new ProjectDTO();
-            BeanUtils.copyProperties(project, projectDTO);
-            arrayList.add(projectDTO);
-        });
-        return arrayList;
+        return projectMapper.findByCategory(category).stream()
+                .map(project -> {
+                    ProjectDTO projectDTO = new ProjectDTO();
+                    BeanUtils.copyProperties(project, projectDTO);
+                    return projectDTO;
+                })
+                .toList();
     }
 
     public List<String> getAllCategories() {
@@ -33,6 +34,9 @@ public class ProjectService {
 
     @Transactional
     public void save(ProjectDTO projectDTO) {
+        if (projectDTO == null) {
+            throw new IllegalArgumentException("Project data is required");
+        }
         Project project = new Project();
         BeanUtils.copyProperties(projectDTO, project);
         if (project.getId() == null) {

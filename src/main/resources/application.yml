@@ -21,4 +21,4 @@ mybatis:
 
 logging:
   level:
-    com.example.portal.mapper: debug
+    kd.address.view.mapper: debug
