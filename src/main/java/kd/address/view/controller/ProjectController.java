@@ -21,7 +21,7 @@ public class ProjectController {
     }
 
     @GetMapping
-    public ApiResponse<List<ProjectDTO>> getProjects(@RequestParam String category) {
+    public ApiResponse<List<ProjectDTO>> getProjects(@RequestParam(required = false) String category) {
         return ApiResponse.success(projectService.getProjectsByCategory(category));
     }
 

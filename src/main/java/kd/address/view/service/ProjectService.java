@@ -19,7 +19,10 @@ public class ProjectService {
     private final ProjectMapper projectMapper;
 
     public List<ProjectDTO> getProjectsByCategory(String category) {
-        return projectMapper.findByCategory(category).stream()
+        List<Project> projects = (category == null || category.isBlank())
+                ? projectMapper.findAll()
+                : projectMapper.findByCategory(category);
+        return projects.stream()
                 .map(project -> {
                     ProjectDTO projectDTO = new ProjectDTO();
                     BeanUtils.copyProperties(project, projectDTO);

@@ -8,6 +8,9 @@ import java.util.List;
 @Mapper
 public interface ProjectMapper {
 
+    @Select("SELECT * FROM project ORDER BY id DESC")
+    List<Project> findAll();
+
     @Select("SELECT * FROM project WHERE category = #{category} ORDER BY id DESC")
     List<Project> findByCategory(@Param("category") String category);
 
