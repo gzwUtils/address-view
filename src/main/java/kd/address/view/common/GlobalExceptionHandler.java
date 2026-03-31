@@ -17,6 +17,13 @@ public class GlobalExceptionHandler {
         return ApiResponse.error(400, ex.getMessage());
     }
 
+    @ExceptionHandler(SecurityException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ApiResponse<Void> handleSecurityException(SecurityException ex) {
+        log.warn("Permission denied: {}", ex.getMessage());
+        return ApiResponse.error(403, ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Void> handleException(Exception ex) {

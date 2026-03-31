@@ -34,7 +34,7 @@ public class ProjectController {
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<Boolean> deleteProject(@PathVariable Long id, @RequestHeader(value = "X-User-Id", required = true) String userId) {
+    public ApiResponse<Boolean> deleteProject(@PathVariable Long id, @RequestHeader(value = "X-User-Id", required = false) String userId) {
         projectService.deleteById(id, userId);
         return ApiResponse.success(Boolean.TRUE);
     }

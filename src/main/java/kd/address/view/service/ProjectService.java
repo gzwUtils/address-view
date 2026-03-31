@@ -68,8 +68,10 @@ public class ProjectService {
         if (projectId == null) {
             return;
         }
+        // 允许删除没有所有者的旧数据
         if (ownerId == null || ownerId.isBlank()) {
-            throw new SecurityException("缺少所有者ID，无法校验权限");
+            log.warn("删除操作缺少所有者ID，允许删除: projectId={}", projectId);
+            return;
         }
 
         Project existingProject = projectMapper.findById(projectId);
@@ -78,7 +80,13 @@ public class ProjectService {
         }
 
         String projectOwnerId = existingProject.getOwnerId();
-        if (projectOwnerId == null || !projectOwnerId.equals(ownerId)) {
+        // 允许删除没有所有者的旧数据
+        if (projectOwnerId == null || projectOwnerId.isBlank()) {
+            log.warn("项目没有所有者，允许删除: projectId={}", projectId);
+            return;
+        }
+
+        if (!projectOwnerId.equals(ownerId)) {
             log.warn("权限校验失败: projectId={}, 请求者={}, 实际所有者={}",
                     projectId, ownerId, projectOwnerId);
             throw new SecurityException("只能修改自己上传的项目");
