@@ -22,8 +22,8 @@ public interface ProjectMapper {
 
     @Insert({
             "<script>",
-            "INSERT INTO project (project_name, short_name, platform_url, background_image, category, type, description, create_time)",
-            "VALUES (#{projectName}, #{shortName}, #{platformUrl}, #{backgroundImage}, #{category}, #{type}, #{description}, now())",
+            "INSERT INTO project (project_name, short_name, platform_url, background_image, category, type, description, owner_id, owner_name, create_time)",
+            "VALUES (#{projectName}, #{shortName}, #{platformUrl}, #{backgroundImage}, #{category}, #{type}, #{description}, #{ownerId}, #{ownerName}, now())",
             "</script>"
     })
     @Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
@@ -39,6 +39,8 @@ public interface ProjectMapper {
             "category = #{category}, ",
             "type = #{type}, ",
             "description = #{description}, ",
+            "owner_id = #{ownerId}, ",
+            "owner_name = #{ownerName}, ",
             "update_time = NOW() ",
             "WHERE id = #{id}",
             "</script>"

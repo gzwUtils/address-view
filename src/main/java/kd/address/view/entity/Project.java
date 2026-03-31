@@ -16,6 +16,8 @@ public class Project {
     private String category;
     private String type;
     private String description;
+    private String ownerId;
+    private String ownerName;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

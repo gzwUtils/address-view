@@ -45,12 +45,43 @@ public class ProjectService {
         if (project.getId() == null) {
             projectMapper.insert(project);
         } else {
+            // 更新前校验权限
+            validateOwnership(project.getId(), projectDTO.getOwnerId());
             projectMapper.update(project);
         }
     }
 
     @Transactional
-    public void deleteById(Long id) {
+    public void deleteById(Long id, String ownerId) {
+        // 删除前校验权限
+        validateOwnership(id, ownerId);
         projectMapper.deleteById(id);
+    }
+
+    /**
+     * 校验项目所有权
+     * @param projectId 项目ID
+     * @param ownerId 所有者ID
+     * @throws SecurityException 如果校验失败
+     */
+    private void validateOwnership(Long projectId, String ownerId) {
+        if (projectId == null) {
+            return;
+        }
+        if (ownerId == null || ownerId.isBlank()) {
+            throw new SecurityException("缺少所有者ID，无法校验权限");
+        }
+
+        Project existingProject = projectMapper.findById(projectId);
+        if (existingProject == null) {
+            throw new IllegalArgumentException("项目不存在: " + projectId);
+        }
+
+        String projectOwnerId = existingProject.getOwnerId();
+        if (projectOwnerId == null || !projectOwnerId.equals(ownerId)) {
+            log.warn("权限校验失败: projectId={}, 请求者={}, 实际所有者={}",
+                    projectId, ownerId, projectOwnerId);
+            throw new SecurityException("只能修改自己上传的项目");
+        }
     }
 }
