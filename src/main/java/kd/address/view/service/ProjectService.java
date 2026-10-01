@@ -10,6 +10,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -18,11 +21,17 @@ public class ProjectService {
 
     private final ProjectMapper projectMapper;
 
-    public List<ProjectDTO> getProjectsByCategory(String category) {
+    public List<ProjectDTO> getProjects(String category, String keyword) {
         List<Project> projects = (category == null || category.isBlank())
                 ? projectMapper.findAll()
                 : projectMapper.findByCategory(category);
+        String normalizedKeyword = keyword == null ? "" : keyword.trim().toLowerCase(Locale.ROOT);
         return projects.stream()
+                .filter(project -> normalizedKeyword.isEmpty() || Stream.of(
+                                project.getProjectName(), project.getShortName(), project.getDescription(),
+                                project.getCategory(), project.getType(), project.getPlatformUrl())
+                        .filter(Objects::nonNull)
+                        .anyMatch(value -> value.toLowerCase(Locale.ROOT).contains(normalizedKeyword)))
                 .map(project -> {
                     ProjectDTO projectDTO = new ProjectDTO();
                     BeanUtils.copyProperties(project, projectDTO);

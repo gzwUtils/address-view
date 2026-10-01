@@ -59,7 +59,7 @@ src/main/java/kd/address/view/
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/projects/categories` | 获取所有分类 |
-| GET | `/api/projects?category={category}` | 按分类查询项目 |
+| GET | `/api/projects?category={category}&keyword={keyword}` | 按分类和关键词查询项目（参数均可选） |
 | POST | `/api/projects` | 新增/更新项目 |
 | DELETE | `/api/projects/{id}` | 删除项目 |
 
