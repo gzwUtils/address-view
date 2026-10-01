@@ -21,7 +21,7 @@ public class ProjectService {
 
     private final ProjectMapper projectMapper;
 
-    public List<ProjectDTO> getProjects(String category, String keyword) {
+    public List<ProjectDTO> getProjects(String category, String keyword, Long accountId) {
         List<Project> projects = (category == null || category.isBlank())
                 ? projectMapper.findAll()
                 : projectMapper.findByCategory(category);
@@ -35,6 +35,7 @@ public class ProjectService {
                 .map(project -> {
                     ProjectDTO projectDTO = new ProjectDTO();
                     BeanUtils.copyProperties(project, projectDTO);
+                    projectDTO.setCanEdit(accountId != null && accountId.equals(project.getOwnerAccountId()));
                     return projectDTO;
                 })
                 .toList();
@@ -45,59 +46,47 @@ public class ProjectService {
     }
 
     @Transactional
-    public void save(ProjectDTO projectDTO) {
+    public void save(ProjectDTO projectDTO, Long accountId, String nickname) {
         if (projectDTO == null) {
             throw new IllegalArgumentException("Project data is required");
         }
         Project project = new Project();
         BeanUtils.copyProperties(projectDTO, project);
         if (project.getId() == null) {
+            project.setOwnerId(null);
+            project.setOwnerName(nickname);
+            project.setOwnerAccountId(accountId);
             projectMapper.insert(project);
         } else {
-            // 更新前校验权限
-            validateOwnership(project.getId(), projectDTO.getOwnerId());
-            projectMapper.update(project);
+            validateOwnership(project.getId(), accountId);
+            projectMapper.updateContent(project);
         }
     }
 
     @Transactional
-    public void deleteById(Long id, String ownerId) {
-        // 删除前校验权限
-        validateOwnership(id, ownerId);
+    public void deleteById(Long id, Long accountId) {
+        validateOwnership(id, accountId);
         projectMapper.deleteById(id);
     }
 
     /**
      * 校验项目所有权
      * @param projectId 项目ID
-     * @param ownerId 所有者ID
+     * @param accountId 由服务端会话验证的账户 ID
      * @throws SecurityException 如果校验失败
      */
-    private void validateOwnership(Long projectId, String ownerId) {
+    private void validateOwnership(Long projectId, Long accountId) {
         if (projectId == null) {
             return;
         }
-        // 允许删除没有所有者的旧数据
-        if (ownerId == null || ownerId.isBlank()) {
-            log.warn("删除操作缺少所有者ID，允许删除: projectId={}", projectId);
-            return;
-        }
-
         Project existingProject = projectMapper.findById(projectId);
         if (existingProject == null) {
             throw new IllegalArgumentException("项目不存在: " + projectId);
         }
 
-        String projectOwnerId = existingProject.getOwnerId();
-        // 允许删除没有所有者的旧数据
-        if (projectOwnerId == null || projectOwnerId.isBlank()) {
-            log.warn("项目没有所有者，允许删除: projectId={}", projectId);
-            return;
-        }
-
-        if (!projectOwnerId.equals(ownerId)) {
-            log.warn("权限校验失败: projectId={}, 请求者={}, 实际所有者={}",
-                    projectId, ownerId, projectOwnerId);
+        Long ownerAccountId = existingProject.getOwnerAccountId();
+        if (ownerAccountId == null || !ownerAccountId.equals(accountId)) {
+            log.warn("项目归属校验失败: projectId={}, accountId={}", projectId, accountId);
             throw new SecurityException("只能修改自己上传的项目");
         }
     }

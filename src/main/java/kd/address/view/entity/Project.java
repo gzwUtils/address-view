@@ -18,6 +18,7 @@ public class Project {
     private String description;
     private String ownerId;
     private String ownerName;
+    private Long ownerAccountId;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

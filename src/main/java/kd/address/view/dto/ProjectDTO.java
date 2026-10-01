@@ -15,4 +15,6 @@ public class ProjectDTO {
     private String description;
     private String ownerId;
     private String ownerName;
+    private Long ownerAccountId;
+    private Boolean canEdit;
 }

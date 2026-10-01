@@ -8,22 +8,25 @@ import java.util.List;
 @Mapper
 public interface ProjectMapper {
 
-    @Select("SELECT * FROM project ORDER BY id DESC")
+    String PROJECT_COLUMNS = "p.id,p.project_name,p.short_name,p.platform_url,p.background_image,p.category,p.type,p.description,p.owner_id,COALESCE(a.nickname,p.owner_name) AS owner_name,p.owner_account_id,p.create_time,p.update_time ";
+    String PROJECT_FROM = "FROM project p LEFT JOIN community_account a ON a.id=p.owner_account_id ";
+
+    @Select("SELECT " + PROJECT_COLUMNS + PROJECT_FROM + "ORDER BY p.id DESC")
     List<Project> findAll();
 
-    @Select("SELECT * FROM project WHERE category = #{category} ORDER BY id DESC")
+    @Select("SELECT " + PROJECT_COLUMNS + PROJECT_FROM + "WHERE p.category = #{category} ORDER BY p.id DESC")
     List<Project> findByCategory(@Param("category") String category);
 
     @Select("SELECT DISTINCT category FROM project ORDER BY category")
     List<String> findAllCategories();
 
-    @Select("SELECT * FROM project WHERE id = #{id}")
+    @Select("SELECT " + PROJECT_COLUMNS + PROJECT_FROM + "WHERE p.id = #{id}")
     Project findById(@Param("id") Long id);
 
     @Insert({
             "<script>",
-            "INSERT INTO project (project_name, short_name, platform_url, background_image, category, type, description, owner_id, owner_name, create_time)",
-            "VALUES (#{projectName}, #{shortName}, #{platformUrl}, #{backgroundImage}, #{category}, #{type}, #{description}, #{ownerId}, #{ownerName}, now())",
+            "INSERT INTO project (project_name, short_name, platform_url, background_image, category, type, description, owner_name, owner_account_id, create_time)",
+            "VALUES (#{projectName}, #{shortName}, #{platformUrl}, #{backgroundImage}, #{category}, #{type}, #{description}, #{ownerName}, #{ownerAccountId}, now())",
             "</script>"
     })
     @Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
@@ -39,13 +42,11 @@ public interface ProjectMapper {
             "category = #{category}, ",
             "type = #{type}, ",
             "description = #{description}, ",
-            "owner_id = #{ownerId}, ",
-            "owner_name = #{ownerName}, ",
             "update_time = NOW() ",
             "WHERE id = #{id}",
             "</script>"
     })
-    void update(Project project);
+    void updateContent(Project project);
 
     @Delete("DELETE FROM project WHERE id = #{id}")
     void deleteById(@Param("id") Long id);
