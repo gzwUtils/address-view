@@ -6,6 +6,8 @@ import kd.address.view.dto.PortalOverviewDTO;
 import kd.address.view.dto.RecentViewDTO;
 import kd.address.view.dto.RecentViewSaveDTO;
 import kd.address.view.service.PortalCatalogService;
+import kd.address.view.service.AdminSessionService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,6 +24,7 @@ import java.util.List;
 public class PortalController {
 
     private final PortalCatalogService portalCatalogService;
+    private final AdminSessionService admin;
 
     @GetMapping("/overview")
     public ApiResponse<PortalOverviewDTO> getOverview() {
@@ -29,7 +32,8 @@ public class PortalController {
     }
 
     @GetMapping("/ops-workbench")
-    public ApiResponse<OpsWorkbenchDTO> getOpsWorkbench() {
+    public ApiResponse<OpsWorkbenchDTO> getOpsWorkbench(HttpServletRequest request) {
+        admin.requireAdmin(request);
         return ApiResponse.success(portalCatalogService.getOpsWorkbench());
     }
 

@@ -1,159 +1,51 @@
-# 权限控制功能部署说明
+# 门户与社区部署
 
-## 概述
-本次更新为项目导航模块添加了基于所有者的权限控制功能，确保用户只能修改和删除自己创建的项目。
+## 数据库升级
 
-## 功能说明
-
-### 前端功能
-1. **用户身份识别**
-   - 基于浏览器指纹 + 时间戳生成唯一用户ID
-   - 用户信息存储在 localStorage 中
-   - 导航栏显示当前用户标识，hover 可查看完整信息
-
-2. **权限控制**
-   - 项目卡片显示上传者信息
-   - 只有创建者可以看到编辑/删除按钮
-   - 新增项目时显示权限提示
-
-3. **用户体验**
-   - 紧急推送功能已隐藏（代码保留）
-   - 资源广场统计显示优化
-
-### 后端功能
-1. **数据模型扩展**
-   - Project 表新增 `owner_id` 和 `owner_name` 字段
-   - ProjectDTO、Project 实体同步更新
-
-2. **权限校验**
-   - Service 层添加权限校验逻辑
-   - Controller 层通过请求头传递用户ID
-   - 更新和删除操作前校验所有权
-
-3. **API 变更**
-   - DELETE `/api/projects/{id}` 新增必需请求头 `X-User-Id`
-
-## 部署步骤
-
-### 1. 数据库迁移
+先备份 MySQL 数据库。已有库依次执行以下脚本，每个迁移脚本只执行一次：
 
 ```bash
-# 连接到 MySQL 数据库
-mysql -u your_username -p your_database
-
-# 执行表结构初始化（如果表不存在）
-source /path/to/address-view/src/main/resources/init_project_table.sql
-
-# 如果表已存在，执行字段迁移
-source /path/to/address-view/src/main/resources/migration_add_owner_fields.sql
+mysql -u "$DB_USERNAME" -p protal < src/main/resources/migration_guest_identity.sql
+mysql -u "$DB_USERNAME" -p protal < src/main/resources/migration_community_forum.sql
 ```
 
-### 2. 后端部署
+新库须先使用现有项目初始化脚本创建 `project` 等基础表，再执行上述迁移。`migration_guest_identity.sql` 添加 `owner_account_id`，不能重复执行。社区脚本预置“项目分享”“技术交流”“闲聊”三个板块。部署过程不会自动迁移既有项目归属。
+
+## 服务配置
+
+服务端通过环境变量读取连接和安全配置：
 
 ```bash
-cd /Users/gaozhiwei/address-view
+export DB_URL='jdbc:mysql://localhost:13306/protal?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true'
+export DB_USERNAME='root'
+export DB_PASSWORD='数据库密码'
+export PORTAL_ALLOWED_ORIGINS='https://portal.example.com'
+export PORTAL_COOKIE_SECURE=true
+export PORTAL_ADMIN_PASSWORD_HASH='BCrypt 哈希'
+```
 
-# 重新编译
-mvn clean package -DskipTests
+生成 BCrypt 哈希后，将结果放入部署环境的 `PORTAL_ADMIN_PASSWORD_HASH`，不要提交密码或哈希。未配置时管理登录会拒绝访问。生产环境使用 HTTPS，在同一域名反向代理 `/api` 到后端 8089；前端所有请求使用相对路径 `/api`。`PORTAL_ALLOWED_ORIGINS` 必须列出实际门户源站，多个值用逗号分隔，不要使用 `*`。本地 `http://localhost:3000` 联调时设置 `PORTAL_COOKIE_SECURE=false`。
 
-# 启动服务
+```bash
+mvn test
+mvn -DskipTests package
 java -jar target/portal-backend-1.0.0.jar
 ```
 
-### 3. 前端部署
+在 `/Users/gaozhiwei/address-plat` 执行 `npm run build`，部署 `dist`。Web 服务器需把前端路由回退到 `index.html`。
 
-```bash
-cd /Users/gaozhiwei/address-plat
+## 账户与管理
 
-# 安装依赖（如果需要）
-npm install
+访客首次打开门户自动获得随机账户 ID、昵称和一次性恢复码。用户应保存账户 ID 与恢复码；换浏览器时用两者恢复同一账户。恢复码只在首次创建或主动重置时展示，服务端只保存哈希。丢失恢复码且原浏览器也不可用时，无法证明账户归属。
 
-# 构建生产版本
-npm run build
+项目新建时由服务端记录账户归属。旧项目因原有浏览器 ID 可以伪造，升级后保持只读。管理员核实项目归属后，可调用 `PATCH /api/admin/projects/{id}/owner`，请求体为 `{"publicId":"P-1234567890"}`，每个旧项目只能分配一次。
 
-# 部署到 Web 服务器（如 Nginx）
-# 或使用 npm run preview 预览
-```
+管理员登录后可在 `/admin/community/reports` 审核举报。内容与 AI 资产的后台写入接口使用同一管理员会话；项目分享仍使用游客账户。会话 Cookie 为 HttpOnly、SameSite=Lax，生产环境需 Secure；写入请求还须通过同源来源校验和 CSRF 校验。
 
-## 文件变更清单
+## 上线检查
 
-### 后端文件
-- `src/main/java/kd/address/view/entity/Project.java` - 添加所有者字段
-- `src/main/java/kd/address/view/dto/ProjectDTO.java` - 添加所有者字段
-- `src/main/java/kd/address/view/mapper/ProjectMapper.java` - 更新 SQL 语句
-- `src/main/java/kd/address/view/service/ProjectService.java` - 添加权限校验
-- `src/main/java/kd/address/view/controller/ProjectController.java` - 添加用户ID请求头
-- `src/main/resources/init_project_table.sql` - 表结构初始化脚本（新增）
-- `src/main/resources/migration_add_owner_fields.sql` - 字段迁移脚本（新增）
-
-### 前端文件
-- `src/api/project.js` - 添加请求拦截器，自动传递用户ID
-- `src/utils/userIdentity.js` - 优化用户ID生成逻辑
-- `src/components/ProjectCard.vue` - 显示上传者，添加删除按钮
-- `src/components/ProjectForm.vue` - 添加权限提示
-- `src/components/ProjectList.vue` - 传递删除事件
-- `src/components/LayoutHeader.vue` - 显示用户信息
-- `src/views/HomeView.vue` - 传递删除事件
-- `src/views/LayoutView.vue` - 隐藏紧急推送
-- `src/views/ProjectsView.vue` - 优化统计显示
-
-## 注意事项
-
-1. **数据兼容性**
-   - 如果数据库中已有项目数据，新增字段会为 NULL
-   - 建议：可以为现有项目分配一个默认所有者，或者允许用户认领
-
-2. **安全性说明**
-   - 当前权限控制基于前端传递的用户ID
-   - 适合内部平台使用，不适合高安全场景
-   - 如需更高安全性，建议接入完整的认证系统（如腾讯云 CloudBase）
-
-3. **浏览器存储**
-   - 用户ID存储在 localStorage 中
-   - 清除浏览器缓存会导致用户身份变更
-   - 同一浏览器多个标签页会共享同一用户身份
-
-4. **紧急推送**
-   - 功能已在前端隐藏，但代码保留
-   - 如需恢复，取消 `LayoutView.vue` 中的注释即可
-
-## 测试建议
-
-1. **权限测试**
-   - 使用两个不同浏览器/无痕模式创建项目
-   - 验证只能看到自己创建项目的编辑/删除按钮
-   - 尝试修改/删除他人项目，应收到权限错误
-
-2. **用户体验测试**
-   - 验证上传者信息正确显示
-   - 检查权限提示文案是否清晰
-   - 确认导航栏用户信息正确显示
-
-3. **边界情况**
-   - 清除 localStorage 后重新创建项目
-   - 尝试在请求头不包含用户ID的情况下删除项目
-   - 验证空用户ID和空项目ID的处理
-
-## 回滚方案
-
-如果需要回滚到之前的版本：
-
-### 后端回滚
-```bash
-# 移除数据库字段
-ALTER TABLE project DROP COLUMN owner_id;
-ALTER TABLE project DROP COLUMN owner_name;
-
-# 恢复旧代码
-git checkout <commit-hash>
-```
-
-### 前端回滚
-```bash
-# 恢复旧代码
-git checkout <commit-hash>
-```
-
-## 技术支持
-
-如有问题，请联系技术支持团队。
+1. 用浏览器 A 领取账户、保存恢复码、发布项目主题并回复。
+2. 用浏览器 B 输入相同账户 ID 和恢复码，确认昵称、项目编辑权限与“我的讨论”一致。
+3. 用浏览器 C 验证无法修改 A 的项目、主题和回复。
+4. 验证举报、管理员隐藏内容、分页和手机端阅读。
+5. 确认 HTTPS、同域 `/api`、`PORTAL_ALLOWED_ORIGINS`、管理员密码哈希和数据库备份均已配置。

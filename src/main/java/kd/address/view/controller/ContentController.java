@@ -6,6 +6,8 @@ import kd.address.view.dto.PortalResourceDTO;
 import kd.address.view.dto.PortalResourceSaveDTO;
 import kd.address.view.dto.TagCountDTO;
 import kd.address.view.service.PortalCatalogService;
+import kd.address.view.service.AdminSessionService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,6 +26,7 @@ import java.util.List;
 public class ContentController {
 
     private final PortalCatalogService portalCatalogService;
+    private final AdminSessionService admin;
 
     @GetMapping("/resources")
     public ApiResponse<PageResponse<PortalResourceDTO>> getResources(
@@ -42,12 +45,14 @@ public class ContentController {
     }
 
     @PostMapping("/resources")
-    public ApiResponse<PortalResourceDTO> saveResource(@RequestBody PortalResourceSaveDTO request) {
+    public ApiResponse<PortalResourceDTO> saveResource(@RequestBody PortalResourceSaveDTO request, HttpServletRequest servletRequest) {
+        admin.requireAdmin(servletRequest);
         return ApiResponse.success(portalCatalogService.saveResource(request));
     }
 
     @DeleteMapping("/resources/{id}")
-    public ApiResponse<Boolean> deleteResource(@PathVariable Long id) {
+    public ApiResponse<Boolean> deleteResource(@PathVariable Long id, HttpServletRequest request) {
+        admin.requireAdmin(request);
         portalCatalogService.deleteResource(id);
         return ApiResponse.success(Boolean.TRUE);
     }

@@ -17,6 +17,12 @@ public class GlobalExceptionHandler {
         return ApiResponse.error(401, ex.getMessage());
     }
 
+    @ExceptionHandler(NotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ApiResponse<Void> handleNotFound(NotFoundException ex) {
+        return ApiResponse.error(404, ex.getMessage());
+    }
+
     @ExceptionHandler({ConflictException.class, DuplicateKeyException.class})
     @ResponseStatus(HttpStatus.CONFLICT)
     public ApiResponse<Void> handleConflict(Exception ex) {

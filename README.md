@@ -1,6 +1,6 @@
 # Portal Backend
 
-团队门户后端服务，提供项目导航、知识文章、AI 资产管理、生活空间和成长落地舱等功能的 RESTful API。
+团队门户后端服务，提供项目导航、社区讨论、知识文章、AI 资产和成长落地舱等功能的 RESTful API。
 
 ## 技术栈
 
@@ -22,13 +22,17 @@ src/main/java/kd/address/view/
 │   ├── ApiResponse.java            # 统一 API 响应体
 │   └── PageResponse.java           # 分页响应体
 ├── config/                         # 配置类
-│   └── WebConfig.java              # CORS 跨域配置
+│   ├── WebConfig.java              # CORS 配置
+│   └── ApiSecurityConfig.java      # CSRF 与来源校验
 ├── controller/                     # REST 控制器
 │   ├── ProjectController.java      # 项目导航 API
 │   ├── PortalController.java       # 门户概览 / 运维工作台 / 最近浏览
 │   ├── ContentController.java      # 内容资源管理 (文章/生活)
 │   ├── AiAssetController.java      # AI 资产管理
-│   └── GrowthCapsuleController.java# 成长落地舱
+│   ├── GrowthCapsuleController.java# 成长落地舱
+│   ├── GuestIdentityController.java# 游客账户与恢复
+│   ├── CommunityController.java    # 板块、主题、回复与举报
+│   └── AdminCommunityController.java# 管理会话与举报处理
 ├── dto/                            # 数据传输对象
 ├── entity/                         # 数据库实体
 ├── mapper/                         # MyBatis Mapper 接口
@@ -49,8 +53,12 @@ src/main/java/kd/address/view/
 | `user_growth_capsule` | 用户灵感落地舱 |
 | `user_growth_item` | 落地舱行动卡 |
 | `user_growth_checkin` | 落地舱打卡记录 |
+| `community_account`, `community_session` | 可跨浏览器恢复的随机账户 |
+| `community_board`, `community_topic`, `community_reply` | 社区板块与讨论 |
+| `community_report`, `community_admin_session` | 举报和管理员会话 |
+| `community_rate_limit` | 发布、恢复等操作的限流记录 |
 
-应用启动时自动执行 `schema.sql`（建表）和 `data.sql`（种子数据）。
+首次部署或升级时，按 [部署说明](DEPLOYMENT.md) 执行数据库迁移。迁移脚本不会在应用启动时自动执行。
 
 ## API 接口
 
@@ -62,6 +70,32 @@ src/main/java/kd/address/view/
 | GET | `/api/projects?category={category}&keyword={keyword}` | 按分类和关键词查询项目（参数均可选） |
 | POST | `/api/projects` | 新增/更新项目 |
 | DELETE | `/api/projects/{id}` | 删除项目 |
+
+项目写入使用服务端验证的游客会话。既有项目默认只读，管理员可在核实后分配归属。
+
+### 游客账户 `/api`
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/me` | 查看当前账户 ID 和昵称 |
+| POST | `/api/guest-sessions` | 领取随机账户和一次性恢复码 |
+| POST | `/api/guest-sessions/restore` | 在另一浏览器用账户 ID、恢复码找回 |
+| PATCH | `/api/me` | 修改昵称 |
+| POST | `/api/me/recovery-code/rotate` | 重置恢复码 |
+
+### 社区 `/api/community`
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/community/boards` | 获取板块 |
+| GET | `/api/community/topics` | 按板块、项目、关键词查询主题 |
+| GET | `/api/community/topics/{id}` | 读取主题 |
+| POST/PATCH/DELETE | `/api/community/topics[/{id}]` | 发布、编辑、删除自己的主题 |
+| GET/POST | `/api/community/topics/{id}/replies` | 分页阅读、发布回复 |
+| PATCH/DELETE | `/api/community/replies/{id}` | 编辑、删除自己的回复 |
+| POST | `/api/community/reports` | 举报主题或回复 |
+
+`GET /api/me/discussions` 查看自己的主题和参与过的讨论。管理员用 `/api/admin/session` 登录，在 `/api/admin/community/reports` 处理举报。
 
 ### 门户概览 `/api/portal`
 
@@ -118,6 +152,8 @@ CREATE DATABASE IF NOT EXISTS protal DEFAULT CHARACTER SET utf8mb4;
 
 ```bash
 export DB_PASSWORD=your_password
+export PORTAL_ALLOWED_ORIGINS=https://portal.example.com
+export PORTAL_ADMIN_PASSWORD_HASH='$2a$12$...'
 ```
 
 ### 构建与运行
@@ -133,7 +169,7 @@ java -jar target/portal-backend-1.0.0.jar
 mvn spring-boot:run
 ```
 
-服务默认启动在 `http://localhost:8089`。
+服务默认启动在 `http://localhost:8089`。生产环境通过同域 HTTPS 反向代理暴露 `/api`，保持 `PORTAL_COOKIE_SECURE=true`。本地 HTTP 联调时需设置 `PORTAL_COOKIE_SECURE=false`。管理员密码使用 BCrypt 哈希，不能把明文或哈希提交到仓库。
 
 ## 开发规范
 

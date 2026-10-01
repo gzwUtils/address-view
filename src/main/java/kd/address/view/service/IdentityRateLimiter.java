@@ -19,6 +19,7 @@ public class IdentityRateLimiter {
     private final RateLimitMapper mapper;
 
     public void checkIssue(String ip) { hit("issue-ip:" + ip, 20, false); }
+    public void checkAdminLogin(String ip) { hit("admin-login-ip:" + ip, 10, false); }
 
     public void checkRestore(String ip, String publicId) {
         hit("restore-ip:" + ip, 30, false);

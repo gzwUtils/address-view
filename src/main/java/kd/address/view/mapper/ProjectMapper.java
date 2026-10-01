@@ -50,4 +50,7 @@ public interface ProjectMapper {
 
     @Delete("DELETE FROM project WHERE id = #{id}")
     void deleteById(@Param("id") Long id);
+
+    @Update("UPDATE project SET owner_account_id=#{accountId} WHERE id=#{id} AND owner_account_id IS NULL")
+    int assignLegacyOwner(@Param("id") Long id, @Param("accountId") Long accountId);
 }

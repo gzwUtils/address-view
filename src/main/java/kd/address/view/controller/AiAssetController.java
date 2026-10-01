@@ -5,6 +5,8 @@ import kd.address.view.common.PageResponse;
 import kd.address.view.dto.PortalResourceDTO;
 import kd.address.view.dto.PortalResourceSaveDTO;
 import kd.address.view.service.PortalCatalogService;
+import kd.address.view.service.AdminSessionService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AiAssetController {
 
     private final PortalCatalogService portalCatalogService;
+    private final AdminSessionService admin;
 
     @GetMapping
     public ApiResponse<PageResponse<PortalResourceDTO>> getAiAssets(
@@ -34,12 +37,14 @@ public class AiAssetController {
     }
 
     @PostMapping
-    public ApiResponse<PortalResourceDTO> saveAiAsset(@RequestBody PortalResourceSaveDTO request) {
+    public ApiResponse<PortalResourceDTO> saveAiAsset(@RequestBody PortalResourceSaveDTO request, HttpServletRequest servletRequest) {
+        admin.requireAdmin(servletRequest);
         return ApiResponse.success(portalCatalogService.saveAiAsset(request));
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<Boolean> deleteAiAsset(@PathVariable Long id) {
+    public ApiResponse<Boolean> deleteAiAsset(@PathVariable Long id, HttpServletRequest request) {
+        admin.requireAdmin(request);
         portalCatalogService.deleteAiAsset(id);
         return ApiResponse.success(Boolean.TRUE);
     }
