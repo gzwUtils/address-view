@@ -53,6 +53,26 @@ CREATE TABLE IF NOT EXISTS project (
     KEY idx_create_time (create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='项目导航表';
 
+-- Public repositories selected from GitHub. Separate from member-owned projects.
+CREATE TABLE IF NOT EXISTS external_project (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    source_platform VARCHAR(32) NOT NULL,
+    source_repo_id BIGINT NOT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    source_url VARCHAR(500) NOT NULL,
+    description VARCHAR(1000) NULL,
+    language VARCHAR(80) NULL,
+    license_spdx VARCHAR(80) NOT NULL,
+    star_count INT NOT NULL DEFAULT 0,
+    fork_count INT NOT NULL DEFAULT 0,
+    repo_created_at DATETIME NOT NULL,
+    synced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    display_rank INT NOT NULL,
+    featured TINYINT NOT NULL DEFAULT 1,
+    UNIQUE KEY uk_external_source_repo (source_platform, source_repo_id),
+    KEY idx_external_featured (featured, display_rank)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='外部开源项目精选';
+
 -- Portal content and activity
 
 CREATE TABLE IF NOT EXISTS portal_resource (
