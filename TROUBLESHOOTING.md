@@ -82,20 +82,10 @@ spring:
 
 ## 数据库初始化
 
-如果数据库表不存在，需要先创建：
+如果是全新数据库，使用统一脚本创建全部表：
 
 ```bash
-# 连接到数据库
-mysql -h 127.0.0.1 -P 13306 -u root -p
-
-# 选择数据库
-USE protal;
-
-# 创建项目表
-source /path/to/init_project_table.sql
-
-# 或者为现有表添加字段
-source /path/to/migration_add_owner_fields.sql
+mysql -h 127.0.0.1 -P 13306 -u "$DB_USERNAME" -p protal < src/main/resources/schema.sql
 ```
 
 ## 部署步骤

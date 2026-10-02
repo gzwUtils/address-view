@@ -58,7 +58,7 @@ src/main/java/kd/address/view/
 | `community_report`, `community_admin_session` | 举报和管理员会话 |
 | `community_rate_limit` | 发布、恢复等操作的限流记录 |
 
-首次部署或升级时，按 [部署说明](DEPLOYMENT.md) 执行数据库迁移。迁移脚本不会在应用启动时自动执行。
+全新数据库使用 `src/main/resources/schema.sql` 一次建立全部 15 张表并写入初始内容；应用启动时也会执行这份可重复运行的脚本。重建已有库前先按 [部署说明](DEPLOYMENT.md) 备份数据。
 
 ## API 接口
 

@@ -1,15 +1,14 @@
 # 门户与社区部署
 
-## 数据库升级
+## 全新数据库初始化
 
-先备份 MySQL 数据库。已有库依次执行以下脚本，每个迁移脚本只执行一次：
+先创建空的 `protal` 数据库，再执行唯一的数据库脚本：
 
 ```bash
-mysql -u "$DB_USERNAME" -p protal < src/main/resources/migration_guest_identity.sql
-mysql -u "$DB_USERNAME" -p protal < src/main/resources/migration_community_forum.sql
+mysql -u "$DB_USERNAME" -p protal < src/main/resources/schema.sql
 ```
 
-新库须先使用现有项目初始化脚本创建 `project` 等基础表，再执行上述迁移。`migration_guest_identity.sql` 添加 `owner_account_id`，不能重复执行。社区脚本预置“项目分享”“技术交流”“闲聊”三个板块。部署过程不会自动迁移既有项目归属。
+`schema.sql` 包含项目、门户、访客账户和社区的全部 15 张表，以及初始门户内容和“项目分享”“技术交流”“闲聊”三个板块。应用启动时也会执行这个脚本；建表与初始数据写入可重复执行。脚本不会删除旧表或迁移旧数据。若要重建已有库，须先备份并在应用停止后清空该库中的旧表，再执行脚本。
 
 ## 服务配置
 
