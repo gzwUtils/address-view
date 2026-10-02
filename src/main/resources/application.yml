@@ -6,7 +6,6 @@ portal:
   allowed-origins: ${PORTAL_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
   admin-password-hash: ${PORTAL_ADMIN_PASSWORD_HASH:}
   github:
-    sync-enabled: ${PORTAL_GITHUB_SYNC_ENABLED:true}
     token: ${GITHUB_API_TOKEN:}
 
 spring:

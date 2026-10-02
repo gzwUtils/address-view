@@ -8,7 +8,7 @@
 mysql -u "$DB_USERNAME" -p protal < src/main/resources/schema.sql
 ```
 
-`schema.sql` 包含项目、外部开源精选、门户、访客账户和社区的全部 16 张表，以及初始门户内容和“项目分享”“技术交流”“闲聊”三个板块。应用启动时也会执行这个脚本；建表与初始数据写入可重复执行。脚本不会删除旧表或迁移旧数据。若要重建已有库，须先备份并在应用停止后清空该库中的旧表，再执行脚本。
+`schema.sql` 包含项目、站外来源配置与收录项目、门户、访客账户和社区的全部 17 张表，以及初始门户内容和“项目分享”“技术交流”“闲聊”三个板块。应用启动时也会执行这个脚本；建表与初始数据写入可重复执行。脚本不会删除旧表或迁移旧数据。若要重建已有库，须先备份并在应用停止后清空该库中的旧表，再执行脚本。
 
 ## 服务配置
 
@@ -21,7 +21,6 @@ export DB_PASSWORD='数据库密码'
 export PORTAL_ALLOWED_ORIGINS='https://portal.example.com'
 export PORTAL_COOKIE_SECURE=true
 export PORTAL_ADMIN_PASSWORD_HASH='BCrypt 哈希'
-export PORTAL_GITHUB_SYNC_ENABLED=true
 # 可选：GitHub API Token，仅用于提高请求额度，不写进前端或数据库
 export GITHUB_API_TOKEN='...'
 ```
@@ -36,11 +35,13 @@ java -jar target/portal-backend-1.0.0.jar
 
 在 `/Users/gaozhiwei/address-plat` 执行 `npm run build`，部署 `dist`。Web 服务器需把前端路由回退到 `index.html`。
 
-## 开源项目自动收录
+## 站外项目自动收录
 
-后端启动 30 秒后，如精选列表为空，会通过 GitHub 官方仓库搜索接口首次收录；此后每周一 09:00（北京时间）更新。初次收录失败时，每天重试一次。查询近 7 天创建、至少 10 星的公开非 fork 仓库，按**当前总星标数**排序，从前 30 个结果中选最多 5 个具有明确 SPDX 开源许可证的仓库。它不是 GitHub Trending 榜单，也不表示近 7 天新增星标数。
+管理员在 `/admin/sources` 配置来源。支持 GitHub 仓库搜索与公开 HTTPS RSS/Atom 订阅；每个来源可独立设置启停、最多收录条数和执行间隔。GitHub 来源还可设置搜索条件、创建时间窗口和最低星标数。`schema.sql` 初始化一个可编辑、可停用的 GitHub 示例来源；管理员也可以添加任意公开订阅源。
 
-外部项目存于独立的 `external_project` 表，通过 `GET /api/open-source/featured` 返回，项目页单独标明 GitHub 来源。只保存仓库名称、摘要、语言、许可证、星标等公开元数据及原站链接；不复制 README 或代码。同步失败、返回空结果时保留上一期记录。设置 `PORTAL_GITHUB_SYNC_ENABLED=false` 可停用定时抓取，已收录记录仍可展示。
+调度器启动 10 秒后检查到期来源，之后每分钟检查一次。每次网络请求最多等待 8 秒，超时记为 `FAILED`，本次直接结束；无立即重试，下次执行时间为本次开始时间加配置间隔。管理员可在页面手动执行。失败或空结果会保留上一期记录。来源配置、上次状态和下次执行时间存于 `external_source`；项目摘要存于独立的 `external_project`，通过 `GET /api/open-source/featured` 返回。后台来源列表、保存、手动执行分别使用 `GET /api/admin/external-sources`、`POST /api/admin/external-sources`、`POST /api/admin/external-sources/{id}/run`，要求管理员会话。
+
+GitHub 搜索选公开非 fork 仓库，并过滤为常见开源许可证；按**收录时总星标数**排序，不是 GitHub Trending 或最近新增星标榜。RSS/Atom 条目展示来源标识及原站链接，许可证信息以原站为准。系统只保存公开元数据和摘要，不复制 README 或代码。
 
 ## 账户与管理
 

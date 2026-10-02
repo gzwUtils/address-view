@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public class ExternalProject {
     private Long id;
     private String sourcePlatform;
+    private String sourceName;
     private Long sourceRepoId;
     private String fullName;
     private String sourceUrl;

@@ -13,21 +13,22 @@ class ExternalProjectServiceTest {
     @Test
     void emptySyncDoesNotReplaceExistingSelection() {
         RecordingMapper mapper = new RecordingMapper();
-        new ExternalProjectService(mapper).replaceFeatured(List.of());
+        new ExternalProjectService(mapper).replaceFeatured("github", List.of());
         assertThat(mapper.clearCount).isZero();
     }
 
     @Test
-    void successfulSyncStoresFiveRankedProjects() {
+    void successfulSyncStoresConfiguredSelectionWithoutFixedFiveItemLimit() {
         RecordingMapper mapper = new RecordingMapper();
         List<ExternalProject> incoming = new ArrayList<>();
         for (int i = 0; i < 7; i++) incoming.add(new ExternalProject());
 
-        new ExternalProjectService(mapper).replaceFeatured(incoming);
+        new ExternalProjectService(mapper).replaceFeatured("github", incoming);
 
         assertThat(mapper.clearCount).isEqualTo(1);
-        assertThat(mapper.saved).hasSize(5);
-        assertThat(mapper.saved).extracting(ExternalProject::getDisplayRank).containsExactly(1, 2, 3, 4, 5);
+        assertThat(mapper.saved).hasSize(7);
+        assertThat(mapper.saved).extracting(ExternalProject::getDisplayRank).containsExactly(1, 2, 3, 4, 5, 6, 7);
+        assertThat(mapper.saved).extracting(ExternalProject::getSourcePlatform).containsOnly("github");
     }
 
     private static class RecordingMapper implements ExternalProjectMapper {
@@ -35,8 +36,7 @@ class ExternalProjectServiceTest {
         List<ExternalProject> saved = new ArrayList<>();
 
         public List<ExternalProject> findFeatured() { return saved; }
-        public int countFeatured() { return saved.size(); }
-        public void clearFeatured() { clearCount++; }
+        public void clearFeatured(String sourceCode) { clearCount++; }
         public void upsert(ExternalProject project) { saved.add(project); }
     }
 }

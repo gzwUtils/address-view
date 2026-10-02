@@ -17,16 +17,13 @@ public class ExternalProjectService {
         return projects.findFeatured();
     }
 
-    public boolean hasFeatured() {
-        return projects.countFeatured() > 0;
-    }
-
     @Transactional
-    public void replaceFeatured(List<ExternalProject> selected) {
+    public void replaceFeatured(String sourceCode, List<ExternalProject> selected) {
         if (selected == null || selected.isEmpty()) return;
-        projects.clearFeatured();
-        for (int index = 0; index < Math.min(5, selected.size()); index++) {
+        projects.clearFeatured(sourceCode);
+        for (int index = 0; index < selected.size(); index++) {
             ExternalProject project = selected.get(index);
+            project.setSourcePlatform(sourceCode);
             project.setDisplayRank(index + 1);
             projects.upsert(project);
         }

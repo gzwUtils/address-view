@@ -53,7 +53,33 @@ CREATE TABLE IF NOT EXISTS project (
     KEY idx_create_time (create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='项目导航表';
 
--- Public repositories selected from GitHub. Separate from member-owned projects.
+-- Admin-configured external project sources, separate from member-owned projects.
+CREATE TABLE IF NOT EXISTS external_source (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    code VARCHAR(32) NOT NULL UNIQUE,
+    display_name VARCHAR(80) NOT NULL,
+    source_type VARCHAR(32) NOT NULL,
+    feed_url VARCHAR(500) NULL,
+    query_text VARCHAR(100) NULL,
+    period_days INT NOT NULL DEFAULT 7,
+    min_stars INT NOT NULL DEFAULT 10,
+    max_items INT NOT NULL DEFAULT 5,
+    interval_hours INT NOT NULL DEFAULT 168,
+    enabled TINYINT NOT NULL DEFAULT 1,
+    deleted TINYINT NOT NULL DEFAULT 0,
+    last_status VARCHAR(16) NULL,
+    last_error VARCHAR(255) NULL,
+    last_run_at DATETIME NULL,
+    next_run_at DATETIME NULL,
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_source_schedule (enabled, deleted, next_run_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='管理员配置的站外项目来源';
+
+INSERT IGNORE INTO external_source
+  (code, display_name, source_type, period_days, min_stars, max_items, interval_hours, enabled, next_run_at)
+VALUES ('github', 'GitHub 新项目', 'github_search', 7, 10, 5, 168, 1, NULL);
+
 CREATE TABLE IF NOT EXISTS external_project (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     source_platform VARCHAR(32) NOT NULL,

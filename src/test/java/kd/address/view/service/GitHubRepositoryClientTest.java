@@ -1,6 +1,7 @@
 package kd.address.view.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kd.address.view.entity.ExternalSource;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -20,7 +21,10 @@ class GitHubRepositoryClientTest {
                 ]}
                 """);
 
-        var selected = client.parseResults(payload);
+        ExternalSource source = new ExternalSource();
+        source.setCode("github");
+        source.setMaxItems(5);
+        var selected = client.parseResults(payload, source);
 
         assertThat(selected).hasSize(1);
         assertThat(selected.get(0).getFullName()).isEqualTo("example/valid");

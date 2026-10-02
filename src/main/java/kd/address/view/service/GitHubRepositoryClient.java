@@ -3,6 +3,7 @@ package kd.address.view.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kd.address.view.entity.ExternalProject;
+import kd.address.view.entity.ExternalSource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -24,7 +25,6 @@ import java.util.Set;
 @Component
 public class GitHubRepositoryClient {
     private static final String SEARCH_URL = "https://api.github.com/search/repositories";
-    private static final String PLATFORM = "github";
     private static final Set<String> OPEN_SOURCE_LICENSES = Set.of(
             "MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "MPL-2.0",
             "GPL-2.0", "GPL-3.0", "GPL-2.0-only", "GPL-3.0-only", "GPL-2.0-or-later",
@@ -39,13 +39,16 @@ public class GitHubRepositoryClient {
         this.token = token;
     }
 
-    public List<ExternalProject> recentLicensedProjects() throws IOException, InterruptedException {
-        LocalDate from = LocalDate.now(ZoneOffset.UTC).minusDays(7);
-        String query = "created:>=" + from + " stars:>=10 fork:false archived:false is:public";
+    public List<ExternalProject> recentLicensedProjects(ExternalSource source) throws IOException, InterruptedException {
+        LocalDate from = LocalDate.now(ZoneOffset.UTC).minusDays(source.getPeriodDays());
+        String query = (source.getQueryText() == null || source.getQueryText().isBlank()
+                ? "" : source.getQueryText().trim() + " ")
+                + "created:>=" + from + " stars:>=" + source.getMinStars()
+                + " fork:false archived:false is:public";
         String url = SEARCH_URL + "?q=" + URLEncoder.encode(query, StandardCharsets.UTF_8)
-                + "&sort=stars&order=desc&per_page=30";
+                + "&sort=stars&order=desc&per_page=" + Math.min(100, source.getMaxItems() * 6);
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
-                .timeout(Duration.ofSeconds(12))
+                .timeout(Duration.ofSeconds(8))
                 .header("Accept", "application/vnd.github+json")
                 .header("X-GitHub-Api-Version", "2022-11-28")
                 .header("User-Agent", "Zaichang-Portal")
@@ -55,22 +58,22 @@ public class GitHubRepositoryClient {
         if (response.statusCode() != 200) {
             throw new IOException("GitHub search returned HTTP " + response.statusCode());
         }
-        return parseResults(json.readTree(response.body()));
+        return parseResults(json.readTree(response.body()), source);
     }
 
-    List<ExternalProject> parseResults(JsonNode response) {
+    List<ExternalProject> parseResults(JsonNode response, ExternalSource source) {
         List<ExternalProject> selected = new ArrayList<>();
         JsonNode items = response.path("items");
         if (!items.isArray()) return selected;
         for (JsonNode item : items) {
-            if (selected.size() >= 5) break;
+            if (selected.size() >= source.getMaxItems()) break;
             String license = item.path("license").path("spdx_id").asText("");
             String fullName = item.path("full_name").asText("");
             String url = item.path("html_url").asText("");
             if (!OPEN_SOURCE_LICENSES.contains(license)
                     || fullName.isBlank() || !url.startsWith("https://github.com/")) continue;
             ExternalProject project = new ExternalProject();
-            project.setSourcePlatform(PLATFORM);
+            project.setSourcePlatform(source.getCode());
             project.setSourceRepoId(item.path("id").asLong());
             project.setFullName(shorten(fullName, 255));
             project.setSourceUrl(shorten(url, 500));
