@@ -36,10 +36,18 @@ class ReportServiceTest {
         when(replies.findById(12L)).thenReturn(reply);
 
         CommunityReport result = service.submit(3L,
-                new ReportRequest("reply", 12L, "包含不合适的内容"), "127.0.0.1");
+                new ReportRequest("reply", 12L, "广告"), "127.0.0.1");
 
         assertEquals(3L, result.getReporterAccountId());
         verify(reports).insert(result);
+        assertEquals("广告", result.getReason());
+    }
+
+    @Test
+    void blankReportReasonIsRejected() {
+        assertThrows(IllegalArgumentException.class, () -> service.submit(3L,
+                new ReportRequest("reply", 12L, "  "), "127.0.0.1"));
+        verify(reports, never()).insert(any());
     }
 
     @Test

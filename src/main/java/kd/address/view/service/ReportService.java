@@ -32,8 +32,8 @@ public class ReportService {
         if (!"topic".equals(request.targetType()) && !"reply".equals(request.targetType()))
             throw new IllegalArgumentException("举报类型无效");
         String reason = request.reason() == null ? "" : request.reason().trim();
-        if (reason.codePointCount(0, reason.length()) < 5 || reason.codePointCount(0, reason.length()) > 500)
-            throw new IllegalArgumentException("举报原因需要 5–500 字");
+        if (reason.codePointCount(0, reason.length()) < 2 || reason.codePointCount(0, reason.length()) > 500)
+            throw new IllegalArgumentException("举报原因需要 2–500 字");
         if ("topic".equals(request.targetType())) {
             CommunityTopic target = topics.findById(request.targetId());
             if (target == null || !"visible".equals(target.getStatus())) throw new NotFoundException("主题不存在");

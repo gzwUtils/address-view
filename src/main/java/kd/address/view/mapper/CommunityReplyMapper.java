@@ -7,8 +7,12 @@ import java.util.List;
 
 @Mapper
 public interface CommunityReplyMapper {
-    String COLUMNS = "r.*,a.nickname AS author_nickname ";
-    String TABLES = "FROM community_reply r JOIN community_account a ON a.id=r.author_account_id ";
+    String COLUMNS = "r.*,a.nickname AS author_nickname, quoted.floor_no AS reply_to_floor_no, " +
+            "quoted_author.nickname AS reply_to_author_nickname, " +
+            "CASE WHEN quoted.status='visible' THEN LEFT(quoted.body, 180) ELSE NULL END AS reply_to_excerpt ";
+    String TABLES = "FROM community_reply r JOIN community_account a ON a.id=r.author_account_id " +
+            "LEFT JOIN community_reply quoted ON quoted.id=r.reply_to_id " +
+            "LEFT JOIN community_account quoted_author ON quoted_author.id=quoted.author_account_id ";
 
     @Select("SELECT " + COLUMNS + TABLES + "WHERE r.topic_id=#{topicId} ORDER BY r.floor_no ASC LIMIT #{size} OFFSET #{offset}")
     List<CommunityReply> findPage(@Param("topicId") Long topicId, @Param("offset") int offset, @Param("size") int size);

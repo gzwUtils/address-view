@@ -10,6 +10,9 @@ public class CommunityReply {
     private Long authorAccountId;
     private String authorNickname;
     private Long replyToId;
+    private Integer replyToFloorNo;
+    private String replyToAuthorNickname;
+    private String replyToExcerpt;
     private Integer floorNo;
     private String body;
     private String status;

@@ -112,6 +112,9 @@ public class ReplyService {
 
     private static void markOwnership(CommunityReply reply, Long accountId) {
         reply.setCanEdit("visible".equals(reply.getStatus()) && accountId != null && accountId.equals(reply.getAuthorAccountId()));
-        if (!"visible".equals(reply.getStatus())) reply.setBody("[这条回复已删除或隐藏]");
+        if (!"visible".equals(reply.getStatus())) {
+            reply.setBody("[这条回复已删除或隐藏]");
+            reply.setReplyToExcerpt(null);
+        }
     }
 }
