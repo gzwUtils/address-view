@@ -25,6 +25,8 @@ export PORTAL_ADMIN_PASSWORD_HASH='BCrypt 哈希'
 export PORTAL_AI_ENCRYPTION_KEY='至少32字符的长期随机密钥'
 # 可选：GitHub API Token，仅用于提高请求额度，不写进前端或数据库
 export GITHUB_API_TOKEN='...'
+# 可选：公开 GitHub 项目解读的 HTTPS 读取代理前缀；直连超时后最多回退一次
+export PORTAL_GITHUB_READING_PROXY_BASE_URL='https://ghproxy.net/'
 ```
 
 生成 BCrypt 哈希后，将结果放入部署环境的 `PORTAL_ADMIN_PASSWORD_HASH`，不要提交密码或哈希。未配置时管理登录会拒绝访问。生产环境使用 HTTPS，在同一域名反向代理 `/api` 到后端 8089；前端所有请求使用相对路径 `/api`。`PORTAL_ALLOWED_ORIGINS` 必须列出实际门户源站，多个值用逗号分隔，不要使用 `*`。本地 `http://localhost:3000` 联调时设置 `PORTAL_COOKIE_SECURE=false`。
@@ -49,7 +51,7 @@ GitHub 搜索选公开非 fork 仓库，并过滤为常见开源许可证；按*
 
 管理员在 `/admin/project-reading` 配置 OpenAI 兼容的 Chat Completions 接口，填写接口地址、模型名和 API Key 后可先测试连接，再设为公开项目的默认引擎。API Key 使用 AES-GCM 加密后写入 `project_reading_engine_profile`；解密依赖至少 32 个字符的 `PORTAL_AI_ENCRYPTION_KEY`，后续部署必须保持同一密钥。无鉴权的兼容接口可不填 API Key。模型服务地址建议使用 HTTPS；HTTP 会明文传输 API Key。
 
-项目同步后，精选 GitHub 项目会进入解读队列。资料读取器只读取公开仓库中的 README、少量文档、项目清单和一个入口文件，不执行仓库代码；超时或模型返回格式错误时记为失败，不自动重试。管理员可以在工作台查看失败原因并手动重试。生成结果包含阅读路径、带来源链接的设计观察、实践建议和读者反思问题；模型结论仍应由读者通过原文核验。
+项目同步后，精选 GitHub 项目会进入解读队列。资料读取器通过 `PORTAL_GITHUB_READING_PROXY_BASE_URL` 配置的 HTTPS 前缀，从 GitHub 默认分支的有限候选路径读取 README、项目清单、少量文档和一个入口文件；不下载整仓库，也不执行仓库代码。该变量默认指向 `https://ghproxy.net/`，部署时可替换成自己的可信读取代理；设为空则直连 GitHub。解读版本由实际读取到的文件内容生成 SHA-256 指纹，引用链接指向仓库默认分支的原文件。资料读取总时限为 60 秒，单个原始文件请求连接最多 5 秒、读取最多 8 秒。超时或模型返回格式错误时记为失败，不自动重试。管理员可以在工作台查看失败原因并手动重试。生成结果包含阅读路径、带来源链接的设计观察、实践建议和读者反思问题；模型结论仍应由读者通过原文核验。
 
 当前仅支持 GitHub 公开仓库。企业私有仓库的身份验证、团队访问控制、资料保留策略和私有模型路由尚未实现，不得把内部代码加入此公开流程。自有智能体需提供 OpenAI 兼容的 `/v1/chat/completions` 接口，或后续为其增加独立适配器。
 

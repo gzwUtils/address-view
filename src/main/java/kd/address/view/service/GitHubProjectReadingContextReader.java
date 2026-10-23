@@ -2,39 +2,43 @@ package kd.address.view.service;
 
 import kd.address.view.entity.ExternalProject;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashSet;
+import java.util.HexFormat;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
 public class GitHubProjectReadingContextReader implements ProjectReadingContextReader {
-    private static final Pattern ROOT_MANIFEST = Pattern.compile("(?i)^(pom\\.xml|package\\.json|pyproject\\.toml|go\\.mod|cargo\\.toml|requirements\\.txt|composer\\.json)$");
+    private static final Pattern REPO_SEGMENT = Pattern.compile("[A-Za-z0-9_.-]+");
+    private static final String VERSION_REF = "HEAD";
     private static final int PER_FILE_LIMIT = 9_000;
     private static final int TOTAL_CONTEXT_LIMIT = 36_000;
-    private static final int MAX_TREE_OUTPUT_BYTES = 8 * 1024 * 1024;
-    private static final int MAX_FILE_OUTPUT_BYTES = 1024 * 1024;
-    private static final Duration CLONE_TIMEOUT = Duration.ofSeconds(45);
-    private static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(15);
+    private static final Duration CONTEXT_TIMEOUT = Duration.ofSeconds(60);
+    private static final int CONNECT_TIMEOUT_MILLIS = 5_000;
+    private static final int READ_TIMEOUT_MILLIS = 8_000;
+
+    private final String readingProxyBaseUrl;
+
+    public GitHubProjectReadingContextReader(
+            @Value("${portal.github.reading-proxy-base-url:https://ghproxy.net/}") String readingProxyBaseUrl) {
+        this.readingProxyBaseUrl = readingProxyBaseUrl == null ? "" : readingProxyBaseUrl.trim();
+    }
 
     @Override
     public boolean supports(ExternalProject project) {
@@ -45,194 +49,141 @@ public class GitHubProjectReadingContextReader implements ProjectReadingContextR
     public ProjectReadingContext read(ExternalProject project) {
         if (!supports(project)) throw new IllegalArgumentException("当前还没有为这个来源配置代码资料读取器");
         RepoPath repo = parseRepo(project.getSourceUrl());
-        Path tempRoot = null;
+        long deadline = System.nanoTime() + CONTEXT_TIMEOUT.toNanos();
+
+        List<ProjectReadingSource> sources = new ArrayList<>();
+        int remaining = TOTAL_CONTEXT_LIMIT;
         try {
-            tempRoot = Files.createTempDirectory("portal-project-reading-");
-            Path checkout = tempRoot.resolve("repo");
-            String cloneUrl = "https://github.com/" + repo.owner() + "/" + repo.name() + ".git";
-            runGit(tempRoot, CLONE_TIMEOUT, 64 * 1024,
-                    "clone", "--quiet", "--filter=blob:none", "--depth=1", "--no-checkout", cloneUrl, checkout.toString());
-
-            String version = runGit(checkout, COMMAND_TIMEOUT, 256, "rev-parse", "HEAD").trim();
-            String treeSha = runGit(checkout, COMMAND_TIMEOUT, 256, "rev-parse", "HEAD^{tree}").trim();
-            if (version.isBlank() || treeSha.isBlank()) throw new IOException("无法确认仓库当前版本");
-            String branch = "default";
-            try {
-                String remoteHead = runGit(checkout, COMMAND_TIMEOUT, 256,
-                        "symbolic-ref", "--short", "refs/remotes/origin/HEAD").trim();
-                if (!remoteHead.isBlank()) branch = remoteHead.replaceFirst("^origin/", "");
-            } catch (IOException ignored) {
-                // Some repositories do not advertise origin/HEAD; the resolved commit is still authoritative.
-            }
-
-            List<String> paths = splitNullDelimited(runGitBytes(checkout, COMMAND_TIMEOUT,
-                    MAX_TREE_OUTPUT_BYTES, "ls-tree", "-r", "--name-only", "-z", "HEAD"));
-            if (paths.isEmpty()) throw new IllegalStateException("仓库文件目录为空或无法读取");
-
-            List<ProjectReadingSource> sources = new ArrayList<>();
-            int remaining = TOTAL_CONTEXT_LIMIT;
-            for (String path : selectPaths(paths)) {
-                if (remaining <= 0) break;
-                String content = readBlob(checkout, path, Math.min(PER_FILE_LIMIT, remaining));
-                if (content.isBlank()) continue;
-                String url = "https://github.com/" + repo.owner() + "/" + repo.name() + "/blob/"
-                        + version + "/" + encodePathForBrowser(path);
-                sources.add(new ProjectReadingSource(path, path, path, url, content));
-                remaining -= content.length();
-            }
-            if (sources.isEmpty()) throw new IllegalStateException("仓库中没有可读取的 README、文档或项目入口文件");
-            String description = project.getDescription() == null ? "" : project.getDescription();
-            String license = project.getLicenseSpdx() == null ? "" : project.getLicenseSpdx();
-            return new ProjectReadingContext(project.getFullName(), description, project.getSourceUrl(),
-                    branch, version, project.getLanguage(), license, sources);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("项目资料读取已中断", exception);
+            remaining = addFirstAvailable(repo, readmePaths(), sources, remaining, deadline);
+            remaining = addFirstAvailable(repo, manifestPaths(project.getLanguage()), sources, remaining, deadline);
+            remaining = addFirstAvailable(repo, documentationPaths(), sources, remaining, deadline);
+            remaining = addFirstAvailable(repo, entryPointPaths(project.getLanguage()), sources, remaining, deadline);
+            addFirstAvailable(repo, List.of("CONTRIBUTING.md"), sources, remaining, deadline);
         } catch (IOException exception) {
             String detail = exception.getMessage();
             throw new IllegalStateException("读取 GitHub 项目资料失败"
                     + (detail == null || detail.isBlank() ? "" : "：" + detail), exception);
-        } finally {
-            deleteTree(tempRoot);
         }
+
+        if (sources.isEmpty()) throw new IllegalStateException("仓库中没有可读取的 README、项目清单或文档");
+        String description = project.getDescription() == null ? "" : project.getDescription();
+        String license = project.getLicenseSpdx() == null ? "" : project.getLicenseSpdx();
+        return new ProjectReadingContext(project.getFullName(), description, project.getSourceUrl(),
+                "default", sourceFingerprint(sources), project.getLanguage(), license, sources);
     }
 
-    private static String readBlob(Path repo, String path, int limit) throws IOException, InterruptedException {
-        String object = "HEAD:" + path;
-        String sizeText = runGit(repo, COMMAND_TIMEOUT, 64, "cat-file", "-s", object).trim();
-        long size;
-        try { size = Long.parseLong(sizeText); }
-        catch (NumberFormatException exception) { throw new IOException("无法读取仓库文件大小：" + path); }
-        if (size <= 0 || size > MAX_FILE_OUTPUT_BYTES) return "";
-        byte[] body = runGitBytes(repo, COMMAND_TIMEOUT, MAX_FILE_OUTPUT_BYTES, "show", object);
-        return new String(body, 0, Math.min(body.length, Math.max(1, limit)), StandardCharsets.UTF_8);
-    }
-
-    private static List<String> splitNullDelimited(byte[] bytes) {
-        String listing = new String(bytes, StandardCharsets.UTF_8);
-        List<String> paths = new ArrayList<>();
-        int start = 0;
-        for (int i = 0; i < listing.length(); i++) {
-            if (listing.charAt(i) == '\0') {
-                if (i > start) paths.add(listing.substring(start, i));
-                start = i + 1;
-            }
+    private int addFirstAvailable(RepoPath repo, List<String> candidates, List<ProjectReadingSource> sources,
+                                  int remaining, long deadline) throws IOException {
+        if (remaining <= 0) return remaining;
+        for (String path : candidates) {
+            String content = readRawFile(repo, path, Math.min(PER_FILE_LIMIT, remaining), deadline);
+            if (content.isBlank()) continue;
+            String url = "https://github.com/" + repo.owner() + "/" + repo.name() + "/blob/"
+                    + VERSION_REF + "/" + encodePathForBrowser(path);
+            sources.add(new ProjectReadingSource(path, path, path, url, content));
+            return remaining - content.length();
         }
-        if (start < listing.length()) paths.add(listing.substring(start));
-        return paths;
+        return remaining;
     }
 
-    private static String runGit(Path workingDirectory, Duration timeout, int maxOutputBytes,
-                                 String... args) throws IOException, InterruptedException {
-        return new String(runGitBytes(workingDirectory, timeout, maxOutputBytes, args), StandardCharsets.UTF_8);
-    }
-
-    private static byte[] runGitBytes(Path workingDirectory, Duration timeout, int maxOutputBytes,
-                                      String... args) throws IOException, InterruptedException {
-        List<String> command = new ArrayList<>();
-        command.add("git");
-        command.add("-C");
-        command.add(workingDirectory.toString());
-        command.addAll(List.of(args));
-        ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true);
-        builder.environment().put("GIT_CONFIG_NOSYSTEM", "1");
-        builder.environment().put("GIT_CONFIG_GLOBAL", "/dev/null");
-        builder.environment().put("GIT_TEMPLATE_DIR", "/dev/null");
-        builder.environment().put("GIT_TERMINAL_PROMPT", "0");
-        builder.environment().put("GIT_LFS_SKIP_SMUDGE", "1");
-        builder.environment().put("GIT_OPTIONAL_LOCKS", "0");
-        builder.environment().put("GIT_ALLOW_PROTOCOL", "https");
-        builder.environment().put("HOME", workingDirectory.toString());
-
-        Process process = builder.start();
-        CompletableFuture<byte[]> output = CompletableFuture.supplyAsync(() -> readBounded(process, maxOutputBytes));
+    private String readRawFile(RepoPath repo, String path, int limit, long deadline) throws IOException {
+        String rawUrl = "https://raw.githubusercontent.com/" + repo.owner() + "/" + repo.name()
+                + "/" + VERSION_REF + "/" + encodePathForBrowser(path);
+        String requestUrl = readingProxyBaseUrl.isBlank() ? rawUrl : proxiedUrl(rawUrl);
+        int timeoutMillis = remainingMillis(deadline);
+        HttpURLConnection connection = null;
         try {
-            if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
-                process.destroyForcibly();
-                output.cancel(true);
-                throw new IOException("GitHub 项目读取超时");
-            }
-        } catch (InterruptedException exception) {
-            process.destroyForcibly();
-            output.cancel(true);
-            Thread.currentThread().interrupt();
-            throw exception;
-        }
-
-        byte[] bytes;
-        try { bytes = output.get(2, TimeUnit.SECONDS); }
-        catch (ExecutionException exception) {
-            Throwable cause = exception.getCause();
-            if (cause instanceof CompletionException completion && completion.getCause() instanceof IOException io)
-                throw io;
-            throw new IOException("读取 GitHub 命令输出失败", cause);
-        } catch (java.util.concurrent.TimeoutException exception) {
-            process.destroyForcibly();
-            throw new IOException("GitHub 命令输出读取超时", exception);
-        }
-        if (process.exitValue() != 0) {
-            String detail = new String(bytes, StandardCharsets.UTF_8).trim();
-            if (detail.length() > 240) detail = detail.substring(0, 240);
-            throw new IOException(detail.isBlank() ? "GitHub 项目读取命令失败" : detail);
-        }
-        return bytes;
-    }
-
-    private static byte[] readBounded(Process process, int maxOutputBytes) {
-        try (InputStream input = process.getInputStream(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            byte[] buffer = new byte[8192];
-            int read;
-            while ((read = input.read(buffer)) != -1) {
-                if (output.size() + read > maxOutputBytes) {
-                    process.destroyForcibly();
-                    throw new IOException("GitHub 项目读取结果超过大小限制");
+            connection = (HttpURLConnection) URI.create(requestUrl).toURL().openConnection();
+            connection.setConnectTimeout(Math.min(CONNECT_TIMEOUT_MILLIS, timeoutMillis));
+            connection.setReadTimeout(Math.min(READ_TIMEOUT_MILLIS, timeoutMillis));
+            connection.setInstanceFollowRedirects(false);
+            connection.setUseCaches(false);
+            connection.setRequestProperty("Accept", "text/plain, */*;q=0.8");
+            int status = connection.getResponseCode();
+            if (status == HttpURLConnection.HTTP_NOT_FOUND) return "";
+            if (status != HttpURLConnection.HTTP_OK)
+                throw new IOException("GitHub 原始文件读取 HTTP " + status + "：" + path);
+            try (InputStream input = connection.getInputStream();
+                 ByteArrayOutputStream output = new ByteArrayOutputStream(Math.min(limit, 4096))) {
+                byte[] buffer = new byte[4096];
+                int read;
+                while (output.size() < limit && (read = input.read(buffer, 0, Math.min(buffer.length, limit - output.size()))) != -1) {
+                    output.write(buffer, 0, read);
                 }
-                output.write(buffer, 0, read);
+                return output.toString(StandardCharsets.UTF_8);
             }
-            return output.toByteArray();
-        } catch (IOException exception) {
-            throw new CompletionException(exception);
+        } catch (SocketTimeoutException exception) {
+            throw new IOException("GitHub 项目读取超时", exception);
+        } finally {
+            if (connection != null) connection.disconnect();
         }
     }
 
-    private static void deleteTree(Path root) {
-        if (root == null || !Files.exists(root)) return;
-        try (Stream<Path> paths = Files.walk(root)) {
-            paths.sorted(Comparator.reverseOrder()).forEach(path -> {
-                try { Files.deleteIfExists(path); }
-                catch (IOException exception) { log.warn("无法清理临时项目资料：{}", path.getFileName()); }
-            });
-        } catch (IOException exception) {
-            log.warn("无法清理临时项目资料目录");
+    private String proxiedUrl(String targetUrl) {
+        URI base;
+        try { base = URI.create(readingProxyBaseUrl); }
+        catch (IllegalArgumentException exception) { throw new IllegalStateException("GitHub 读取代理地址无效", exception); }
+        if (!"https".equalsIgnoreCase(base.getScheme()) || base.getHost() == null || base.getRawUserInfo() != null
+                || base.getRawQuery() != null || base.getRawFragment() != null)
+            throw new IllegalStateException("GitHub 读取代理必须是无凭据的 HTTPS 地址");
+        return (readingProxyBaseUrl.endsWith("/") ? readingProxyBaseUrl : readingProxyBaseUrl + "/") + targetUrl;
+    }
+
+    private static int remainingMillis(long deadline) throws IOException {
+        long millis = Duration.ofNanos(Math.max(0, deadline - System.nanoTime())).toMillis();
+        if (millis <= 0) throw new IOException("GitHub 项目读取超时");
+        return (int) Math.min(Integer.MAX_VALUE, millis);
+    }
+
+    private static String sourceFingerprint(List<ProjectReadingSource> sources) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            for (ProjectReadingSource source : sources) {
+                digest.update(source.path().getBytes(StandardCharsets.UTF_8));
+                digest.update((byte) 0);
+                digest.update(source.content().getBytes(StandardCharsets.UTF_8));
+                digest.update((byte) 0);
+            }
+            return "sha256:" + HexFormat.of().formatHex(digest.digest());
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("无法计算项目资料版本", exception);
         }
     }
 
-    private static List<String> selectPaths(List<String> paths) {
-        Set<String> selected = new LinkedHashSet<>();
-        paths.stream().filter(path -> path.matches("(?i)^readme(?:\\.[^/]+)?$"))
-                .findFirst().ifPresent(selected::add);
-        paths.stream().filter(path -> !path.contains("/") && ROOT_MANIFEST.matcher(path).matches())
-                .sorted().limit(2).forEach(selected::add);
-        paths.stream().filter(path -> path.toLowerCase().startsWith("docs/") && path.toLowerCase().endsWith(".md"))
-                .sorted(Comparator.comparingInt(GitHubProjectReadingContextReader::docPriority).thenComparing(String::compareTo))
-                .limit(3).forEach(selected::add);
-        paths.stream().filter(GitHubProjectReadingContextReader::isEntryPoint)
-                .sorted().findFirst().ifPresent(selected::add);
-        return selected.stream().limit(7).toList();
+    private static List<String> readmePaths() {
+        return List.of("README.md", "README.en.md", "README.rst", "readme.md");
     }
 
-    private static int docPriority(String path) {
-        String lower = path.toLowerCase();
-        if (lower.contains("architecture") || lower.contains("design")) return 0;
-        if (lower.contains("getting-started") || lower.contains("quickstart") || lower.contains("overview")) return 1;
-        return 2;
+    private static List<String> manifestPaths(String language) {
+        String normalized = language == null ? "" : language.toLowerCase();
+        if (normalized.contains("python")) return List.of("pyproject.toml", "requirements.txt", "setup.py");
+        if (normalized.contains("java") || normalized.contains("kotlin"))
+            return List.of("pom.xml", "build.gradle.kts", "build.gradle");
+        if (normalized.contains("javascript") || normalized.contains("typescript")) return List.of("package.json");
+        if (normalized.contains("go")) return List.of("go.mod");
+        if (normalized.contains("rust")) return List.of("Cargo.toml");
+        if (normalized.contains("php")) return List.of("composer.json");
+        if (normalized.contains("c#") || normalized.contains("csharp")) return List.of("global.json", "Directory.Build.props");
+        if (normalized.equals("c") || normalized.contains("c++") || normalized.contains("cpp"))
+            return List.of("CMakeLists.txt", "Makefile");
+        return List.of("package.json", "pom.xml", "pyproject.toml", "go.mod", "Cargo.toml");
     }
 
-    private static boolean isEntryPoint(String path) {
-        String lower = path.toLowerCase();
-        return lower.endsWith("application.java") || lower.endsWith("/main.rs") || lower.endsWith("/main.py")
-                || lower.equals("main.py") || lower.equals("src/index.ts") || lower.equals("src/index.js")
-                || lower.equals("src/main.ts") || lower.equals("src/main.js") || lower.equals("app.py");
+    private static List<String> documentationPaths() {
+        return List.of("docs/ARCHITECTURE.md", "docs/architecture.md", "docs/README.md", "ARCHITECTURE.md");
+    }
+
+    private static List<String> entryPointPaths(String language) {
+        String normalized = language == null ? "" : language.toLowerCase();
+        if (normalized.contains("python")) return List.of("src/main.py", "main.py", "app.py", "src/app.py");
+        if (normalized.contains("java") || normalized.contains("kotlin"))
+            return List.of("src/main/java/Application.java", "src/main/java/Main.java", "src/main/java/App.java");
+        if (normalized.contains("javascript") || normalized.contains("typescript"))
+            return List.of("src/index.ts", "src/main.ts", "src/index.js", "src/main.js");
+        if (normalized.contains("go")) return List.of("main.go", "cmd/main.go");
+        if (normalized.contains("rust")) return List.of("src/main.rs", "src/lib.rs");
+        if (normalized.equals("c")) return List.of("src/main.c", "main.c");
+        return List.of();
     }
 
     private static RepoPath parseRepo(String sourceUrl) {
@@ -244,7 +195,7 @@ public class GitHubProjectReadingContextReader implements ProjectReadingContextR
                 || (uri.getPort() != -1 && uri.getPort() != 443))
             throw new IllegalArgumentException("当前第一版的代码资料读取仅支持 GitHub 仓库");
         String[] parts = uri.getPath().replaceAll("^/|/$", "").split("/");
-        if (parts.length != 2 || !parts[0].matches("[A-Za-z0-9_.-]+") || !parts[1].matches("[A-Za-z0-9_.-]+")
+        if (parts.length != 2 || !REPO_SEGMENT.matcher(parts[0]).matches() || !REPO_SEGMENT.matcher(parts[1]).matches()
                 || ".".equals(parts[0]) || "..".equals(parts[0]) || ".".equals(parts[1]) || "..".equals(parts[1]))
             throw new IllegalArgumentException("无法从来源地址识别 GitHub 仓库");
         String name = parts[1].replaceFirst("\\.git$", "");
@@ -254,7 +205,7 @@ public class GitHubProjectReadingContextReader implements ProjectReadingContextR
     private static String encodePathForBrowser(String path) {
         return java.util.Arrays.stream(path.split("/", -1))
                 .map(segment -> URLEncoder.encode(segment, StandardCharsets.UTF_8).replace("+", "%20"))
-                .collect(java.util.stream.Collectors.joining("/"));
+                .collect(Collectors.joining("/"));
     }
 
     private record RepoPath(String owner, String name) {}

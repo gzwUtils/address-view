@@ -9,6 +9,7 @@ portal:
     encryption-key: ${PORTAL_AI_ENCRYPTION_KEY:}
   github:
     token: ${GITHUB_API_TOKEN:}
+    reading-proxy-base-url: ${PORTAL_GITHUB_READING_PROXY_BASE_URL:https://ghproxy.net/}
 
 spring:
   datasource:
