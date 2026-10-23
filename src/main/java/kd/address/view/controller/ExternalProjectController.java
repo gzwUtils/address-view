@@ -24,6 +24,11 @@ public class ExternalProjectController {
         return ApiResponse.success(projects.featured());
     }
 
+    @GetMapping("/reading-guides")
+    public ApiResponse<List<ExternalProject>> publishedReadingGuides() {
+        return ApiResponse.success(projects.publishedReadingGuides());
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<ExternalProject> get(@PathVariable Long id) {
         return ApiResponse.success(projects.get(id));

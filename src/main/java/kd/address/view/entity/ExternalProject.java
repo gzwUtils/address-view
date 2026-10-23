@@ -24,4 +24,6 @@ public class ExternalProject {
     private Boolean featured;
     private String readingGuideStatus;
     private LocalDateTime readingGuideUpdatedAt;
+    private String readingGuideHook;
+    private String readingGuidePurpose;
 }

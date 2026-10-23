@@ -18,6 +18,10 @@ public class ExternalProjectService {
         return projects.findFeatured();
     }
 
+    public List<ExternalProject> publishedReadingGuides() {
+        return projects.findPublishedGuides();
+    }
+
     public ExternalProject get(Long id) {
         ExternalProject project = projects.findById(id);
         if (project == null) {
