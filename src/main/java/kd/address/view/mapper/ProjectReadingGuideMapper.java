@@ -14,7 +14,7 @@ public interface ProjectReadingGuideMapper {
     List<Long> findFailedProjectIdsByError(String error);
 
     @Select("SELECT external_project_id FROM project_reading_guide WHERE status='FAILED' " +
-            "AND (last_error='解读引擎没有返回正文' " +
+            "AND (last_error='读取 GitHub 项目资料失败：GitHub 返回 HTTP 403' " +
             "OR last_error LIKE '读取 GitHub 项目资料失败：Stream % cancelled')")
     List<Long> findLegacyReaderFailureProjectIds();
 

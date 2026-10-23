@@ -37,6 +37,7 @@ public class OpenAiCompatibleChatEngine implements ProjectReadingEngineAdapter {
         payload.put("model", profile.getModelName());
         payload.put("temperature", 0.35);
         payload.put("max_tokens", 2200);
+        if (shouldDisableDeepSeekThinking(profile)) payload.putObject("thinking").put("type", "disabled");
         ArrayNode messages = payload.putArray("messages");
         messages.addObject().put("role", "system").put("content", systemPrompt);
         messages.addObject().put("role", "user").put("content", userPrompt);
@@ -87,6 +88,15 @@ public class OpenAiCompatibleChatEngine implements ProjectReadingEngineAdapter {
         return "";
     }
 
+    static boolean shouldDisableDeepSeekThinking(ProjectReadingEngineProfile profile) {
+        if (profile == null || profile.getBaseUrl() == null) return false;
+        try {
+            return "api.deepseek.com".equalsIgnoreCase(URI.create(profile.getBaseUrl()).getHost());
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
+    }
+
     private static String textValue(JsonNode value) {
         if (value == null || value.isMissingNode() || value.isNull()) return "";
         if (value.isTextual()) return value.asText();
@@ -101,7 +111,9 @@ public class OpenAiCompatibleChatEngine implements ProjectReadingEngineAdapter {
         if (value.isObject()) {
             String text = value.path("text").asText("");
             if (!text.isBlank()) return text;
-            return textValue(value.path("parts"));
+            String parts = textValue(value.path("parts"));
+            if (!parts.isBlank()) return parts;
+            if (value.has("projectPurpose") || value.has("readingPath")) return value.toString();
         }
         return "";
     }
