@@ -9,6 +9,7 @@ public class ExternalProject {
     private Long id;
     private String sourcePlatform;
     private String sourceName;
+    private String sourceType;
     private Long sourceRepoId;
     private String fullName;
     private String sourceUrl;
@@ -21,4 +22,6 @@ public class ExternalProject {
     private LocalDateTime syncedAt;
     private Integer displayRank;
     private Boolean featured;
+    private String readingGuideStatus;
+    private LocalDateTime readingGuideUpdatedAt;
 }

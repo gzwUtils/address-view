@@ -8,7 +8,7 @@
 mysql -u "$DB_USERNAME" -p protal < src/main/resources/schema.sql
 ```
 
-`schema.sql` 包含项目、站外来源配置与收录项目、门户、访客账户和社区的全部 17 张表，以及初始门户内容和“项目分享”“技术交流”“闲聊”三个板块。应用启动时也会执行这个脚本；建表与初始数据写入可重复执行。脚本不会删除旧表或迁移旧数据。若要重建已有库，须先备份并在应用停止后清空该库中的旧表，再执行脚本。
+`schema.sql` 包含项目、站外来源、项目解读、门户、访客账户和社区的全部 20 张表，以及初始门户内容和“项目分享”“技术交流”“闲聊”三个板块。应用启动时也会执行这个脚本；建表与初始数据写入可重复执行。脚本不会删除旧表或迁移旧数据。若要重建已有库，须先备份并在应用停止后清空该库中的旧表，再执行脚本。
 
 ## 服务配置
 
@@ -21,6 +21,8 @@ export DB_PASSWORD='数据库密码'
 export PORTAL_ALLOWED_ORIGINS='https://portal.example.com'
 export PORTAL_COOKIE_SECURE=true
 export PORTAL_ADMIN_PASSWORD_HASH='BCrypt 哈希'
+# 使用带鉴权的解读模型时设置；所有后续部署必须保持同一个值
+export PORTAL_AI_ENCRYPTION_KEY='至少32字符的长期随机密钥'
 # 可选：GitHub API Token，仅用于提高请求额度，不写进前端或数据库
 export GITHUB_API_TOKEN='...'
 ```
@@ -42,6 +44,14 @@ java -jar target/portal-backend-1.0.0.jar
 调度器启动 10 秒后检查到期来源，之后每分钟检查一次。每次网络请求最多等待 8 秒，超时记为 `FAILED`，本次直接结束；无立即重试，下次执行时间为本次开始时间加配置间隔。管理员可在页面手动执行。失败或空结果会保留上一期记录。来源配置、上次状态和下次执行时间存于 `external_source`；项目摘要存于独立的 `external_project`，通过 `GET /api/open-source/featured` 返回。后台来源列表、保存、手动执行分别使用 `GET /api/admin/external-sources`、`POST /api/admin/external-sources`、`POST /api/admin/external-sources/{id}/run`，要求管理员会话。
 
 GitHub 搜索选公开非 fork 仓库，并过滤为常见开源许可证；按**收录时总星标数**排序，不是 GitHub Trending 或最近新增星标榜。RSS/Atom 条目展示来源标识及原站链接，许可证信息以原站为准。系统只保存公开元数据和摘要，不复制 README 或代码。
+
+## 项目解读
+
+管理员在 `/admin/project-reading` 配置 OpenAI 兼容的 Chat Completions 接口，填写接口地址、模型名和 API Key 后可先测试连接，再设为公开项目的默认引擎。API Key 使用 AES-GCM 加密后写入 `project_reading_engine_profile`；解密依赖至少 32 个字符的 `PORTAL_AI_ENCRYPTION_KEY`，后续部署必须保持同一密钥。无鉴权的兼容接口可不填 API Key。模型服务地址建议使用 HTTPS；HTTP 会明文传输 API Key。
+
+项目同步后，精选 GitHub 项目会进入解读队列。资料读取器只读取公开仓库中的 README、少量文档、项目清单和一个入口文件，不执行仓库代码；超时或模型返回格式错误时记为失败，不自动重试。管理员可以在工作台查看失败原因并手动重试。生成结果包含阅读路径、带来源链接的设计观察、实践建议和读者反思问题；模型结论仍应由读者通过原文核验。
+
+当前仅支持 GitHub 公开仓库。企业私有仓库的身份验证、团队访问控制、资料保留策略和私有模型路由尚未实现，不得把内部代码加入此公开流程。自有智能体需提供 OpenAI 兼容的 `/v1/chat/completions` 接口，或后续为其增加独立适配器。
 
 ## 账户与管理
 

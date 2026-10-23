@@ -5,6 +5,8 @@ portal:
   cookie-secure: ${PORTAL_COOKIE_SECURE:true}
   allowed-origins: ${PORTAL_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
   admin-password-hash: ${PORTAL_ADMIN_PASSWORD_HASH:}
+  ai:
+    encryption-key: ${PORTAL_AI_ENCRYPTION_KEY:}
   github:
     token: ${GITHUB_API_TOKEN:}
 
@@ -18,6 +20,10 @@ spring:
     init:
       mode: always
       encoding: UTF-8
+  task:
+    scheduling:
+      pool:
+        size: 2
 
 
 mybatis:

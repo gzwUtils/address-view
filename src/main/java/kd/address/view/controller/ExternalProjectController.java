@@ -3,6 +3,7 @@ package kd.address.view.controller;
 import kd.address.view.common.ApiResponse;
 import kd.address.view.entity.ExternalProject;
 import kd.address.view.service.ExternalProjectService;
+import kd.address.view.service.ProjectReadingGuideService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,6 +17,7 @@ import java.util.List;
 @RequestMapping("/api/open-source")
 public class ExternalProjectController {
     private final ExternalProjectService projects;
+    private final ProjectReadingGuideService readingGuides;
 
     @GetMapping("/featured")
     public ApiResponse<List<ExternalProject>> featured() {
@@ -25,5 +27,10 @@ public class ExternalProjectController {
     @GetMapping("/{id}")
     public ApiResponse<ExternalProject> get(@PathVariable Long id) {
         return ApiResponse.success(projects.get(id));
+    }
+
+    @GetMapping("/{id}/reading-guide")
+    public ApiResponse<ProjectReadingGuideService.GuideView> readingGuide(@PathVariable Long id) {
+        return ApiResponse.success(readingGuides.get(id));
     }
 }

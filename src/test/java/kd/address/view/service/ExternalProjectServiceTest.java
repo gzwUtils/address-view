@@ -36,6 +36,7 @@ class ExternalProjectServiceTest {
         List<ExternalProject> saved = new ArrayList<>();
 
         public List<ExternalProject> findFeatured() { return saved; }
+        public List<ExternalProject> findReadingCandidates() { return saved; }
         public ExternalProject findById(Long id) { return null; }
         public void clearFeatured(String sourceCode) { clearCount++; }
         public void upsert(ExternalProject project) { saved.add(project); }

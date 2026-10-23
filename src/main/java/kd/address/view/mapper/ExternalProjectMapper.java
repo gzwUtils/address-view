@@ -11,12 +11,19 @@ import java.util.List;
 
 @Mapper
 public interface ExternalProjectMapper {
-    @Select("SELECT p.*,s.display_name AS source_name FROM external_project p " +
+    @Select("SELECT p.*,s.display_name AS source_name,s.source_type AS source_type FROM external_project p " +
             "JOIN external_source s ON s.code=p.source_platform " +
             "WHERE p.featured=1 AND s.enabled=1 AND s.deleted=0 ORDER BY s.id,p.display_rank LIMIT 60")
     List<ExternalProject> findFeatured();
 
-    @Select("SELECT p.*,s.display_name AS source_name FROM external_project p " +
+    @Select("SELECT p.*,s.display_name AS source_name,s.source_type AS source_type," +
+            "g.status AS reading_guide_status,g.update_time AS reading_guide_updated_at " +
+            "FROM external_project p LEFT JOIN external_source s ON s.code=p.source_platform " +
+            "LEFT JOIN project_reading_guide g ON g.external_project_id=p.id " +
+            "ORDER BY p.featured DESC,p.synced_at DESC,p.id DESC LIMIT 120")
+    List<ExternalProject> findReadingCandidates();
+
+    @Select("SELECT p.*,s.display_name AS source_name,s.source_type AS source_type FROM external_project p " +
             "LEFT JOIN external_source s ON s.code=p.source_platform WHERE p.id=#{id}")
     ExternalProject findById(@Param("id") Long id);
 

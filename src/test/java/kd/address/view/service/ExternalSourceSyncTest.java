@@ -30,7 +30,7 @@ class ExternalSourceSyncTest {
         when(sourceService.get(9L)).thenReturn(source);
         when(github.recentLicensedProjects(source)).thenThrow(new HttpTimeoutException("request timed out"));
 
-        new ExternalSourceSync(mapper, sourceService, projects, github, rss).runNow(9L);
+        new ExternalSourceSync(mapper, sourceService, projects, github, rss, mock(ProjectReadingGuideService.class)).runNow(9L);
 
         verify(projects, never()).replaceFeatured(any(), any());
         ArgumentCaptor<LocalDateTime> started = ArgumentCaptor.forClass(LocalDateTime.class);

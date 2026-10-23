@@ -7,6 +7,8 @@ import kd.address.view.entity.CommunityBoard;
 import kd.address.view.entity.CommunityTopic;
 import kd.address.view.mapper.CommunityBoardMapper;
 import kd.address.view.mapper.CommunityTopicMapper;
+import kd.address.view.mapper.CommunityTopicContextMapper;
+import kd.address.view.mapper.ExternalProjectMapper;
 import kd.address.view.mapper.ProjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,22 +22,32 @@ public class TopicService {
     private final CommunityBoardMapper boards;
     private final CommunityTopicMapper topics;
     private final ProjectMapper projects;
+    private final ExternalProjectMapper externalProjects;
+    private final CommunityTopicContextMapper contexts;
     private final IdentityRateLimiter limiter;
 
     public List<CommunityBoard> boards() { return boards.findVisible(); }
 
-    public PageResponse<CommunityTopic> list(String boardCode, Long projectId, String keyword,
+    public PageResponse<CommunityTopic> list(String boardCode, Long projectId, Long externalProjectId,
+                                              String contentType, String keyword,
                                               String sort, int page, int size, Long accountId) {
         validatePage(page, size);
+        if (projectId != null && externalProjectId != null)
+            throw new IllegalArgumentException("一次只能关联一个项目");
         if (boardCode != null && !boardCode.isBlank() && boards.findVisibleByCode(boardCode) == null)
             throw new NotFoundException("板块不存在");
         String order = sort == null || sort.isBlank() ? "recent" : sort;
         if (!"recent".equals(order) && !"new".equals(order)) throw new IllegalArgumentException("排序方式无效");
         String search = keyword == null ? "" : keyword.trim();
         if (search.length() > 100) throw new IllegalArgumentException("关键词过长");
-        List<CommunityTopic> records = topics.findPage(boardCode, projectId, search, order, (page - 1) * size, size);
+        String typeFilter = contentType == null ? "" : contentType.trim();
+        if (!typeFilter.isEmpty() && !"discussion".equals(typeFilter) && !"reflection".equals(typeFilter))
+            throw new IllegalArgumentException("主题类型无效");
+        List<CommunityTopic> records = topics.findPage(boardCode, projectId, externalProjectId,
+                typeFilter, search, order, (page - 1) * size, size);
         records.forEach(topic -> markOwnership(topic, accountId));
-        return PageResponse.of(records, topics.count(boardCode, projectId, search), page, size);
+        return PageResponse.of(records, topics.count(boardCode, projectId, externalProjectId,
+                typeFilter, search), page, size);
     }
 
     public PageResponse<CommunityTopic> mine(Long accountId, int page, int size) {
@@ -64,6 +76,7 @@ public class TopicService {
         topic.setTitle(value.title());
         topic.setBody(value.body());
         topics.insert(topic);
+        saveContext(topic.getId(), request, value.contentType());
         return get(topic.getId(), accountId);
     }
 
@@ -77,6 +90,8 @@ public class TopicService {
         current.setTitle(value.title());
         current.setBody(value.body());
         topics.updateContent(current);
+        contexts.deleteByTopicId(id);
+        saveContext(id, request, value.contentType());
         return get(id, accountId);
     }
 
@@ -91,8 +106,18 @@ public class TopicService {
         if (request == null) throw new IllegalArgumentException("主题内容不能为空");
         CommunityBoard board = boards.findVisibleByCode(request.boardCode());
         if (board == null) throw new IllegalArgumentException("请选择有效板块");
+        if (request.projectId() != null && request.externalProjectId() != null)
+            throw new IllegalArgumentException("一次只能关联一个项目");
         if (request.projectId() != null && projects.findById(request.projectId()) == null)
             throw new IllegalArgumentException("关联项目不存在");
+        if (request.externalProjectId() != null && externalProjects.findById(request.externalProjectId()) == null)
+            throw new IllegalArgumentException("关联的站外项目不存在");
+        String contentType = request.contentType() == null || request.contentType().isBlank()
+                ? "discussion" : request.contentType().trim();
+        if (!"discussion".equals(contentType) && !"reflection".equals(contentType))
+            throw new IllegalArgumentException("主题类型无效");
+        if ("reflection".equals(contentType) && request.projectId() == null && request.externalProjectId() == null)
+            throw new IllegalArgumentException("读后感需要关联一个项目");
         String title = request.title() == null ? "" : request.title().trim();
         String body = request.body() == null ? "" : request.body().trim();
         int titleLength = title.codePointCount(0, title.length());
@@ -101,7 +126,15 @@ public class TopicService {
         if (bodyLength < 10 || bodyLength > 10000) throw new IllegalArgumentException("正文需要 10–10000 字");
         if (title.codePoints().anyMatch(Character::isISOControl) || body.codePoints().anyMatch(cp -> Character.isISOControl(cp) && cp != '\n' && cp != '\t'))
             throw new IllegalArgumentException("内容包含不可见控制字符");
-        return new Validated(board, title, body);
+        return new Validated(board, title, body, contentType);
+    }
+
+    private void saveContext(Long topicId, TopicRequest request, String contentType) {
+        if (request.externalProjectId() != null) {
+            contexts.insert(topicId, "external_project", request.externalProjectId(), contentType);
+        } else if (request.projectId() != null && "reflection".equals(contentType)) {
+            contexts.insert(topicId, "project", request.projectId(), contentType);
+        }
     }
 
     private static void validatePage(int page, int size) {
@@ -117,5 +150,5 @@ public class TopicService {
             throw new SecurityException("只能修改自己的主题");
     }
 
-    private record Validated(CommunityBoard board, String title, String body) {}
+    private record Validated(CommunityBoard board, String title, String body, String contentType) {}
 }

@@ -7,12 +7,20 @@ import java.util.List;
 
 @Mapper
 public interface CommunityTopicMapper {
-    String COLUMNS = "t.*,b.code AS board_code,b.name AS board_name,a.nickname AS author_nickname,p.project_name ";
+    String COLUMNS = "t.*,b.code AS board_code,b.name AS board_name,a.nickname AS author_nickname," +
+            "p.project_name,ctx.reference_type," +
+            "CASE WHEN ctx.reference_type='external_project' THEN ctx.reference_id END AS external_project_id," +
+            "ctx.content_type," +
+            "ep.full_name AS external_project_name ";
     String TABLES = "FROM community_topic t JOIN community_board b ON b.id=t.board_id " +
-            "JOIN community_account a ON a.id=t.author_account_id LEFT JOIN project p ON p.id=t.project_id ";
+            "JOIN community_account a ON a.id=t.author_account_id LEFT JOIN project p ON p.id=t.project_id " +
+            "LEFT JOIN community_topic_context ctx ON ctx.topic_id=t.id " +
+            "LEFT JOIN external_project ep ON ctx.reference_type='external_project' AND ep.id=ctx.reference_id ";
     String FILTER = "WHERE t.status='visible' AND b.status='visible' " +
             "<if test='boardCode != null and boardCode != \"\"'>AND b.code=#{boardCode} </if>" +
             "<if test='projectId != null'>AND t.project_id=#{projectId} </if>" +
+            "<if test='externalProjectId != null'>AND ctx.reference_type='external_project' AND ctx.reference_id=#{externalProjectId} </if>" +
+            "<if test='contentType != null and contentType != \"\"'>AND COALESCE(ctx.content_type,'discussion')=#{contentType} </if>" +
             "<if test='keyword != null and keyword != \"\"'>AND (INSTR(t.title,#{keyword})>0 OR INSTR(t.body,#{keyword})>0) </if>";
 
     @Select("<script>SELECT " + COLUMNS + TABLES + FILTER +
@@ -20,11 +28,15 @@ public interface CommunityTopicMapper {
             "<otherwise>ORDER BY COALESCE(t.last_reply_time,t.create_time) DESC,t.id DESC </otherwise></choose>" +
             "LIMIT #{size} OFFSET #{offset}</script>")
     List<CommunityTopic> findPage(@Param("boardCode") String boardCode, @Param("projectId") Long projectId,
+                                  @Param("externalProjectId") Long externalProjectId,
+                                  @Param("contentType") String contentType,
                                   @Param("keyword") String keyword, @Param("sort") String sort,
                                   @Param("offset") int offset, @Param("size") int size);
 
     @Select("<script>SELECT COUNT(*) " + TABLES + FILTER + "</script>")
     long count(@Param("boardCode") String boardCode, @Param("projectId") Long projectId,
+               @Param("externalProjectId") Long externalProjectId,
+               @Param("contentType") String contentType,
                @Param("keyword") String keyword);
 
     @Select("SELECT " + COLUMNS + TABLES + "WHERE t.id=#{id} LIMIT 1")

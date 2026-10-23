@@ -36,13 +36,16 @@ public class CommunityController {
     public ApiResponse<PageResponse<CommunityTopic>> list(
             @RequestParam(required = false) String board,
             @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) Long externalProjectId,
+            @RequestParam(required = false) String contentType,
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "recent") String sort,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             HttpServletRequest request) {
         GuestAccount account = identities.optionalCurrent(request);
-        return ApiResponse.success(topics.list(board, projectId, keyword, sort, page, size,
+        return ApiResponse.success(topics.list(board, projectId, externalProjectId, contentType,
+                keyword, sort, page, size,
                 account == null ? null : account.getId()));
     }
 

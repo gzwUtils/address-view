@@ -22,6 +22,7 @@ public class ExternalSourceSync {
     private final ExternalProjectService projects;
     private final GitHubRepositoryClient github;
     private final RssProjectClient rss;
+    private final ProjectReadingGuideService readingGuides;
 
     @Scheduled(initialDelay = 10_000, fixedDelay = 60_000)
     public synchronized void runDue() {
@@ -47,6 +48,13 @@ public class ExternalSourceSync {
             };
             if (items.isEmpty()) throw new IOException("本次没有可收录项目");
             projects.replaceFeatured(source.getCode(), items);
+            if ("github_search".equals(source.getSourceType())) {
+                try { readingGuides.enqueueFeaturedFromSource(source.getCode()); }
+                catch (RuntimeException exception) {
+                    log.warn("站外项目同步成功，但解读任务未能入队：source={}, error={}",
+                            source.getCode(), exception.getMessage());
+                }
+            }
             log.info("站外来源 {} 收录完成：{} 条", source.getCode(), items.size());
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();

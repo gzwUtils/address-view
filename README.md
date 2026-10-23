@@ -55,10 +55,14 @@ src/main/java/kd/address/view/
 | `user_growth_checkin` | 落地舱打卡记录 |
 | `community_account`, `community_session` | 可跨浏览器恢复的随机账户 |
 | `community_board`, `community_topic`, `community_reply` | 社区板块与讨论 |
+| `community_topic_context` | 社区主题关联站外项目及读后感类型 |
 | `community_report`, `community_admin_session` | 举报和管理员会话 |
 | `community_rate_limit` | 发布、恢复等操作的限流记录 |
+| `external_source`, `external_project` | 管理员配置的站外来源与收录项目 |
+| `project_reading_engine_profile` | 服务端加密保存的解读引擎配置 |
+| `project_reading_guide` | 项目解读、来源版本与异步任务状态 |
 
-全新数据库使用 `src/main/resources/schema.sql` 一次建立全部 15 张表并写入初始内容；应用启动时也会执行这份可重复运行的脚本。重建已有库前先按 [部署说明](DEPLOYMENT.md) 备份数据。
+全新数据库使用 `src/main/resources/schema.sql` 一次建立全部 20 张表并写入初始内容；应用启动时也会执行这份可重复运行的脚本。重建已有库前先按 [部署说明](DEPLOYMENT.md) 备份数据。
 
 ## API 接口
 
@@ -72,6 +76,19 @@ src/main/java/kd/address/view/
 | DELETE | `/api/projects/{id}` | 删除项目 |
 
 项目写入使用服务端验证的游客会话。既有项目默认只读，管理员可在核实后分配归属。
+
+### 站外项目解读 `/api/open-source`
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/open-source/featured` | 获取站外精选项目 |
+| GET | `/api/open-source/{id}/reading-guide` | 获取项目解读与来源引用 |
+| GET | `/api/admin/open-source/reading-guides` | 管理员查看已收录项目和解读状态 |
+| POST | `/api/admin/open-source/{id}/reading-guide` | 将项目解读加入生成队列 |
+| GET/POST | `/api/admin/project-reading/engines` | 查看或保存解读引擎配置 |
+| POST | `/api/admin/project-reading/engines/{id}/test` | 测试模型接口 |
+
+当前适配 OpenAI 兼容的 Chat Completions 接口。第一版资料读取器只处理 GitHub 公开仓库；会读取 README、少量文档和入口文件，不执行仓库代码。管理员配置的模型服务会收到这些公开资料。企业私有仓库的导入、访问控制和私有模型路由尚未实现，请不要将私有源码放入公开解读流程。
 
 ### 游客账户 `/api`
 

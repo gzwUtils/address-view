@@ -99,6 +99,42 @@ CREATE TABLE IF NOT EXISTS external_project (
     KEY idx_external_featured (featured, display_rank)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='外部开源项目精选';
 
+-- Configurable, server-side project reading engines. API keys are encrypted by
+-- the application and are never returned to the browser.
+CREATE TABLE IF NOT EXISTS project_reading_engine_profile (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    protocol VARCHAR(32) NOT NULL DEFAULT 'openai-compatible',
+    base_url VARCHAR(500) NOT NULL,
+    model_name VARCHAR(160) NOT NULL,
+    api_key_ciphertext VARCHAR(1200) NULL,
+    timeout_seconds INT NOT NULL DEFAULT 60,
+    enabled TINYINT NOT NULL DEFAULT 1,
+    default_for_public TINYINT NOT NULL DEFAULT 0,
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_reading_engine_enabled (enabled, default_for_public)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='项目解读引擎配置';
+
+CREATE TABLE IF NOT EXISTS project_reading_guide (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    external_project_id BIGINT NOT NULL,
+    engine_profile_id BIGINT NOT NULL,
+    generated_engine_profile_id BIGINT NULL,
+    force_regenerate TINYINT NOT NULL DEFAULT 0,
+    status VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/RUNNING/SUCCESS/FAILED',
+    source_version VARCHAR(128) NULL,
+    guide_json LONGTEXT NULL,
+    last_error VARCHAR(500) NULL,
+    queued_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    started_at DATETIME NULL,
+    completed_at DATETIME NULL,
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_reading_guide_project (external_project_id),
+    KEY idx_reading_guide_jobs (status, queued_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='站外项目学习解读与任务状态';
+
 -- Portal content and activity
 
 CREATE TABLE IF NOT EXISTS portal_resource (
@@ -235,6 +271,17 @@ CREATE TABLE IF NOT EXISTS community_topic (
   KEY idx_project (project_id),
   KEY idx_author (author_account_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Optional project context for discussions and reader reflections. Kept in a
+-- separate additive table so existing topics and databases remain compatible.
+CREATE TABLE IF NOT EXISTS community_topic_context (
+  topic_id BIGINT PRIMARY KEY,
+  reference_type VARCHAR(24) NOT NULL COMMENT 'project/external_project',
+  reference_id BIGINT NOT NULL COMMENT '项目或站外项目ID',
+  content_type VARCHAR(24) NOT NULL DEFAULT 'discussion' COMMENT 'discussion/reflection',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_project_context (reference_type, reference_id, content_type, topic_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='社区主题的项目关联与内容类型';
 
 CREATE TABLE IF NOT EXISTS community_reply (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,

@@ -13,6 +13,9 @@ public class CommunityTopic {
     private String authorNickname;
     private Long projectId;
     private String projectName;
+    private Long externalProjectId;
+    private String externalProjectName;
+    private String contentType;
     private String title;
     private String body;
     private Integer replyCount;
