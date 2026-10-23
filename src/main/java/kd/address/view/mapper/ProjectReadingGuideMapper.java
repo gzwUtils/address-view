@@ -3,10 +3,15 @@ package kd.address.view.mapper;
 import kd.address.view.entity.ProjectReadingGuide;
 import org.apache.ibatis.annotations.*;
 
+import java.util.List;
+
 @Mapper
 public interface ProjectReadingGuideMapper {
     @Select("SELECT * FROM project_reading_guide WHERE external_project_id=#{projectId} LIMIT 1")
     ProjectReadingGuide findByProjectId(Long projectId);
+
+    @Select("SELECT external_project_id FROM project_reading_guide WHERE status='FAILED' AND last_error=#{error}")
+    List<Long> findFailedProjectIdsByError(String error);
 
     @Select("SELECT * FROM project_reading_guide WHERE status='PENDING' ORDER BY queued_at,id LIMIT 1")
     ProjectReadingGuide findNextPending();

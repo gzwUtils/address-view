@@ -87,7 +87,9 @@ public class GitHubProjectReadingContextReader implements ProjectReadingContextR
             Thread.currentThread().interrupt();
             throw new IllegalStateException("项目资料读取已中断", exception);
         } catch (IOException exception) {
-            throw new IllegalStateException("读取 GitHub 项目资料失败", exception);
+            String detail = exception.getMessage();
+            throw new IllegalStateException("读取 GitHub 项目资料失败"
+                    + (detail == null || detail.isBlank() ? "" : "：" + detail), exception);
         }
     }
 
@@ -106,13 +108,17 @@ public class GitHubProjectReadingContextReader implements ProjectReadingContextR
     }
 
     private String getRaw(RepoPath repo, String version, String path, int limit) throws IOException, InterruptedException {
-        String url = "https://raw.githubusercontent.com/" + repo.owner() + "/" + repo.name() + "/"
-                + version + "/" + encodePathForBrowser(path);
-        HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(8))
-                .header("User-Agent", "Zaichang-Project-Reader").GET().build();
+        String url = API + "/repos/" + repo.owner() + "/" + repo.name() + "/contents/"
+                + encodePathForBrowser(path) + "?ref=" + encodePath(version);
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(8))
+                .header("Accept", "application/vnd.github.raw+json")
+                .header("X-GitHub-Api-Version", "2022-11-28")
+                .header("User-Agent", "Zaichang-Project-Reader").GET();
+        if (!token.isBlank()) builder.header("Authorization", "Bearer " + token);
+        HttpRequest request = builder.build();
         HttpResponse<byte[]> response = http.send(request, BoundedBodyHandlers.truncate(Math.max(1, limit)));
         if (response.statusCode() < 200 || response.statusCode() >= 300)
-            throw new IOException("读取仓库文件失败：" + path + "（HTTP " + response.statusCode() + "）");
+            throw new IOException("GitHub 文件接口返回 HTTP " + response.statusCode() + "：" + path);
         return new String(response.body(), StandardCharsets.UTF_8);
     }
 

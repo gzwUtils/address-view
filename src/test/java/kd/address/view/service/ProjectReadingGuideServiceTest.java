@@ -41,6 +41,18 @@ class ProjectReadingGuideServiceTest {
     }
 
     @Test
+    void startupRecoveryRetriesOnlyKnownLegacyGithubReaderFailures() {
+        ProjectReadingGuideMapper guides = mock(ProjectReadingGuideMapper.class);
+        when(guides.findFailedProjectIdsByError("读取 GitHub 项目资料失败")).thenReturn(List.of(21L, 22L));
+        ProjectReadingGuideQueueService queue = new ProjectReadingGuideQueueService(
+                mock(ExternalProjectMapper.class), guides);
+
+        assertThat(queue.retryLegacyGithubReadFailures(5L)).isEqualTo(2);
+        verify(guides).enqueue(21L, 5L, true);
+        verify(guides).enqueue(22L, 5L, true);
+    }
+
+    @Test
     void periodicSyncDoesNotAutomaticallyRetryFailedGuide() {
         ExternalProjectMapper projects = mock(ExternalProjectMapper.class);
         ProjectReadingGuideMapper guides = mock(ProjectReadingGuideMapper.class);
