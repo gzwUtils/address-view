@@ -1,5 +1,6 @@
 package kd.address.view.service;
 
+import kd.address.view.common.NotFoundException;
 import kd.address.view.entity.ExternalProject;
 import kd.address.view.mapper.ExternalProjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,14 @@ public class ExternalProjectService {
 
     public List<ExternalProject> featured() {
         return projects.findFeatured();
+    }
+
+    public ExternalProject get(Long id) {
+        ExternalProject project = projects.findById(id);
+        if (project == null) {
+            throw new NotFoundException("站外项目不存在");
+        }
+        return project;
     }
 
     @Transactional

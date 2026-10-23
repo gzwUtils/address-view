@@ -31,11 +31,13 @@ public class GrowthCapsuleService {
     private static final String STATUS_DONE = "done";
 
     private static final String SOURCE_PROJECT = "project";
+    private static final String SOURCE_OPEN_SOURCE_PROJECT = "open_source_project";
     private static final String SOURCE_AI = "ai";
     private static final String SOURCE_ARTICLE = "article";
     private static final String SOURCE_LIFE = "life";
 
     private static final int EXPECTED_MINUTES_PROJECT = 45;
+    private static final int EXPECTED_MINUTES_OPEN_SOURCE_PROJECT = 30;
     private static final int EXPECTED_MINUTES_AI = 30;
     private static final int EXPECTED_MINUTES_LIFE = 15;
     private static final int EXPECTED_MINUTES_DEFAULT = 25;
@@ -96,7 +98,7 @@ public class GrowthCapsuleService {
         item.setNote(StringUtils.hasText(request.getNote()) ? request.getNote().trim() : null);
         item.setValueSummary(buildValueSummary(item));
         item.setFirstStep(buildFirstStep(item));
-        item.setSevenDayPlan(buildSevenDayPlan());
+        item.setSevenDayPlan(SOURCE_OPEN_SOURCE_PROJECT.equals(item.getSourceKind()) ? null : buildSevenDayPlan());
         item.setActionPlan(buildActionPlan(item));
         item.setStatus(STATUS_TODO);
         item.setExpectedMinutes(resolveExpectedMinutes(item.getSourceKind()));
@@ -169,8 +171,9 @@ public class GrowthCapsuleService {
         long aiCount = items.stream().filter(item -> SOURCE_AI.equals(item.getSourceKind())).count();
         long articleCount = items.stream().filter(item -> SOURCE_ARTICLE.equals(item.getSourceKind())).count();
         long projectCount = items.stream().filter(item -> SOURCE_PROJECT.equals(item.getSourceKind())).count();
+        long externalProjectCount = items.stream().filter(item -> SOURCE_OPEN_SOURCE_PROJECT.equals(item.getSourceKind())).count();
         long lifeCount = items.stream().filter(item -> SOURCE_LIFE.equals(item.getSourceKind())).count();
-        return "你已沉淀 " + items.size() + " 个行动卡，其中项目 " + projectCount + " 个、文章 " + articleCount + " 个、AI 资产 " + aiCount + " 个、生活灵感 " + lifeCount + " 个。";
+        return "你已沉淀 " + items.size() + " 个行动卡，其中站内项目 " + projectCount + " 个、站外项目 " + externalProjectCount + " 个、文章 " + articleCount + " 个、AI 资产 " + aiCount + " 个、生活灵感 " + lifeCount + " 个。";
     }
 
     private int calculateStreakDays(Long capsuleId) {
@@ -257,6 +260,9 @@ public class GrowthCapsuleService {
         if (SOURCE_PROJECT.equals(sourceKind)) {
             return EXPECTED_MINUTES_PROJECT;
         }
+        if (SOURCE_OPEN_SOURCE_PROJECT.equals(sourceKind)) {
+            return EXPECTED_MINUTES_OPEN_SOURCE_PROJECT;
+        }
         if (SOURCE_AI.equals(sourceKind)) {
             return EXPECTED_MINUTES_AI;
         }
@@ -267,6 +273,9 @@ public class GrowthCapsuleService {
     }
 
     private String buildValueSummary(GrowthCapsuleItem item) {
+        if (SOURCE_OPEN_SOURCE_PROJECT.equals(item.getSourceKind())) {
+            return "项目名称、描述和技术信息来自来源平台；功能、维护状态与使用条件请以原站为准。";
+        }
         List<String> chunks = new ArrayList<>();
         chunks.add("这条内容不是一次性浏览，它适合沉淀成你的长期能力资产。");
         if (StringUtils.hasText(item.getSubtitle())) {
@@ -278,6 +287,9 @@ public class GrowthCapsuleService {
     private String buildFirstStep(GrowthCapsuleItem item) {
         if (SOURCE_PROJECT.equals(item.getSourceKind())) {
             return "先打开项目入口，记录你最想解决的一个真实问题，并写下 1 条试用结论。";
+        }
+        if (SOURCE_OPEN_SOURCE_PROJECT.equals(item.getSourceKind())) {
+            return "先阅读原站的项目说明和许可证，确认运行环境，再完成一个最小示例；把使用的命令和遇到的问题记在打卡里。";
         }
         if (SOURCE_AI.equals(item.getSourceKind())) {
             return "先用这项 AI 能力完成一个 10 分钟以内的小任务，再评估是否值得纳入日常流程。";
@@ -293,6 +305,10 @@ public class GrowthCapsuleService {
     }
 
     private String buildActionPlan(GrowthCapsuleItem item) {
-        return "价值定位：" + buildValueSummary(item) + "\n第一步：" + buildFirstStep(item) + "\n7天推进：" + buildSevenDayPlan();
+        String plan = "内容说明：" + buildValueSummary(item) + "\n第一步：" + buildFirstStep(item);
+        if (!SOURCE_OPEN_SOURCE_PROJECT.equals(item.getSourceKind())) {
+            plan += "\n7天推进：" + buildSevenDayPlan();
+        }
+        return plan;
     }
 }

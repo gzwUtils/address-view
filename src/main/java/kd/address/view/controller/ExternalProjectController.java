@@ -5,6 +5,7 @@ import kd.address.view.entity.ExternalProject;
 import kd.address.view.service.ExternalProjectService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -19,5 +20,10 @@ public class ExternalProjectController {
     @GetMapping("/featured")
     public ApiResponse<List<ExternalProject>> featured() {
         return ApiResponse.success(projects.featured());
+    }
+
+    @GetMapping("/{id}")
+    public ApiResponse<ExternalProject> get(@PathVariable Long id) {
+        return ApiResponse.success(projects.get(id));
     }
 }

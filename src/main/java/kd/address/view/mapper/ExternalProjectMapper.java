@@ -16,6 +16,10 @@ public interface ExternalProjectMapper {
             "WHERE p.featured=1 AND s.enabled=1 AND s.deleted=0 ORDER BY s.id,p.display_rank LIMIT 60")
     List<ExternalProject> findFeatured();
 
+    @Select("SELECT p.*,s.display_name AS source_name FROM external_project p " +
+            "LEFT JOIN external_source s ON s.code=p.source_platform WHERE p.id=#{id}")
+    ExternalProject findById(@Param("id") Long id);
+
     @Update("UPDATE external_project SET featured = 0 WHERE featured = 1 AND source_platform=#{sourceCode}")
     void clearFeatured(@Param("sourceCode") String sourceCode);
 
