@@ -18,7 +18,7 @@ public class ProjectReadingGuideStartupBackfill {
     public void enqueueMissingGuides() {
         ProjectReadingEngineProfile engine = profiles.defaultForPublic();
         if (engine == null) return;
-        int recovered = queue.retryLegacyGithubReadFailures(engine.getId());
+        int recovered = queue.retryLegacyReaderFailures(engine.getId());
         int queued = queue.enqueueMissingFeatured(engine.getId());
         if (recovered > 0 || queued > 0)
             log.info("默认解读引擎已就绪，恢复旧读取失败项目 {} 个，补排未生成项目 {} 个", recovered, queued);

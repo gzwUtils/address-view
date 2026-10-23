@@ -41,13 +41,14 @@ class ProjectReadingGuideServiceTest {
     }
 
     @Test
-    void startupRecoveryRetriesOnlyKnownLegacyGithubReaderFailures() {
+    void startupRecoveryRetriesOnlyKnownLegacyReaderFailures() {
         ProjectReadingGuideMapper guides = mock(ProjectReadingGuideMapper.class);
-        when(guides.findFailedProjectIdsByError("读取 GitHub 项目资料失败")).thenReturn(List.of(21L, 22L));
+        when(guides.findLegacyReaderFailureProjectIds()).thenReturn(new java.util.ArrayList<>(List.of(21L)));
+        when(guides.findFailedProjectIdsByError("解读引擎没有返回正文")).thenReturn(List.of(22L));
         ProjectReadingGuideQueueService queue = new ProjectReadingGuideQueueService(
                 mock(ExternalProjectMapper.class), guides);
 
-        assertThat(queue.retryLegacyGithubReadFailures(5L)).isEqualTo(2);
+        assertThat(queue.retryLegacyReaderFailures(5L)).isEqualTo(2);
         verify(guides).enqueue(21L, 5L, true);
         verify(guides).enqueue(22L, 5L, true);
     }

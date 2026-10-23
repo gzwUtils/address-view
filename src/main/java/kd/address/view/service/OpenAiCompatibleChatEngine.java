@@ -13,6 +13,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.StringJoiner;
 
 @Component
 public class OpenAiCompatibleChatEngine implements ProjectReadingEngineAdapter {
@@ -54,8 +55,8 @@ public class OpenAiCompatibleChatEngine implements ProjectReadingEngineAdapter {
                 throw new IllegalStateException("解读引擎返回 HTTP " + response.statusCode());
             }
             JsonNode root = json.readTree(response.body());
-            String content = root.path("choices").path(0).path("message").path("content").asText("").trim();
-            if (content.isBlank()) throw new IllegalStateException("解读引擎没有返回正文");
+            String content = responseText(root).trim();
+            if (content.isBlank()) throw new IllegalStateException("解读引擎没有返回正文（响应结构：" + responseShape(root) + "）");
             return content;
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
@@ -70,5 +71,59 @@ public class OpenAiCompatibleChatEngine implements ProjectReadingEngineAdapter {
         if (base.endsWith("/chat/completions")) return URI.create(base);
         if (base.endsWith("/v1")) return URI.create(base + "/chat/completions");
         return URI.create(base + "/v1/chat/completions");
+    }
+
+    static String responseText(JsonNode root) {
+        String outputText = textValue(root.path("output_text"));
+        if (!outputText.isBlank()) return outputText;
+        JsonNode choices = root.path("choices");
+        if (!choices.isArray()) return "";
+        for (JsonNode choice : choices) {
+            String messageText = textValue(choice.path("message").path("content"));
+            if (!messageText.isBlank()) return messageText;
+            String legacyText = textValue(choice.path("text"));
+            if (!legacyText.isBlank()) return legacyText;
+        }
+        return "";
+    }
+
+    private static String textValue(JsonNode value) {
+        if (value == null || value.isMissingNode() || value.isNull()) return "";
+        if (value.isTextual()) return value.asText();
+        if (value.isArray()) {
+            StringJoiner joined = new StringJoiner("\n");
+            value.forEach(part -> {
+                String text = part.isTextual() ? part.asText() : part.path("text").asText("");
+                if (!text.isBlank()) joined.add(text);
+            });
+            return joined.toString();
+        }
+        if (value.isObject()) {
+            String text = value.path("text").asText("");
+            if (!text.isBlank()) return text;
+            return textValue(value.path("parts"));
+        }
+        return "";
+    }
+
+    private static String responseShape(JsonNode root) {
+        JsonNode choices = root.path("choices");
+        JsonNode first = choices.isArray() && !choices.isEmpty() ? choices.get(0) : null;
+        JsonNode message = first == null ? null : first.path("message");
+        JsonNode content = message == null ? null : message.path("content");
+        String contentType = content == null || content.isMissingNode() ? "missing"
+                : content.isNull() ? "null" : content.isArray() ? "array"
+                : content.isObject() ? "object" : content.isTextual() ? "string" : "other";
+        return "root=" + fieldNames(root) + ", choices=" + (choices.isArray() ? choices.size() : 0)
+                + ", choice=" + fieldNames(first) + ", message=" + fieldNames(message)
+                + ", content=" + contentType + ", finish_reason="
+                + (first == null ? "missing" : first.path("finish_reason").asText("missing"));
+    }
+
+    private static String fieldNames(JsonNode node) {
+        if (node == null || !node.isObject()) return "[]";
+        StringJoiner names = new StringJoiner(",", "[", "]");
+        node.fieldNames().forEachRemaining(names::add);
+        return names.toString();
     }
 }

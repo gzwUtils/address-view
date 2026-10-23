@@ -116,10 +116,12 @@ public class GitHubProjectReadingContextReader implements ProjectReadingContextR
                 .header("User-Agent", "Zaichang-Project-Reader").GET();
         if (!token.isBlank()) builder.header("Authorization", "Bearer " + token);
         HttpRequest request = builder.build();
-        HttpResponse<byte[]> response = http.send(request, BoundedBodyHandlers.truncate(Math.max(1, limit)));
+        HttpResponse<byte[]> response = http.send(request,
+                BoundedBodyHandlers.rejectOversize(MAX_GITHUB_JSON_BYTES));
         if (response.statusCode() < 200 || response.statusCode() >= 300)
             throw new IOException("GitHub 文件接口返回 HTTP " + response.statusCode() + "：" + path);
-        return new String(response.body(), StandardCharsets.UTF_8);
+        byte[] body = response.body();
+        return new String(body, 0, Math.min(body.length, Math.max(1, limit)), StandardCharsets.UTF_8);
     }
 
     private static List<String> selectPaths(List<String> paths) {
