@@ -16,6 +16,7 @@ public class ProjectReadingEngineProfileService {
     private final ProjectReadingEngineProfileMapper profiles;
     private final ProjectReadingSecretCipher cipher;
     private final ProjectReadingEngineRegistry engines;
+    private final ProjectReadingGuideQueueService readingQueue;
 
     public record ProfileInput(Long id, String name, String protocol, String baseUrl, String modelName,
                                String apiKey, Integer timeoutSeconds, Boolean enabled,
@@ -26,13 +27,14 @@ public class ProjectReadingEngineProfileService {
                               boolean hasApiKey) {}
 
     public record TestResult(boolean success, String message) {}
+    public record SaveResult(ProfileView profile, int queuedProjectCount) {}
 
     public List<ProfileView> list() {
         return profiles.findAll().stream().map(ProjectReadingEngineProfileService::view).toList();
     }
 
     @Transactional
-    public ProfileView save(ProfileInput input) {
+    public SaveResult save(ProfileInput input) {
         if (input == null) throw new IllegalArgumentException("请填写解读引擎配置");
         String name = required(input.name(), 100, "引擎名称");
         String protocol = input.protocol() == null || input.protocol().isBlank()
@@ -62,7 +64,8 @@ public class ProjectReadingEngineProfileService {
         if (makeDefault) profiles.clearPublicDefault();
         if (profile.getId() == null) profiles.insert(profile);
         else if (profiles.update(profile) == 0) throw new NotFoundException("解读引擎不存在");
-        return view(profile);
+        int queuedProjectCount = makeDefault ? readingQueue.enqueueMissingFeatured(profile.getId()) : 0;
+        return new SaveResult(view(profile), queuedProjectCount);
     }
 
     public TestResult test(Long id) {

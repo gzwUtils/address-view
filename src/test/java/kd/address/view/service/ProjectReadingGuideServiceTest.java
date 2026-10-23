@@ -17,6 +17,30 @@ import static org.mockito.Mockito.*;
 
 class ProjectReadingGuideServiceTest {
     @Test
+    void backfillQueuesOnlyNeverGeneratedFeaturedGithubProjects() {
+        ExternalProjectMapper projects = mock(ExternalProjectMapper.class);
+        ProjectReadingGuideMapper guides = mock(ProjectReadingGuideMapper.class);
+        ExternalProject missing = new ExternalProject();
+        missing.setId(12L);
+        missing.setSourceType("github_search");
+        ExternalProject failed = new ExternalProject();
+        failed.setId(13L);
+        failed.setSourceType("github_search");
+        failed.setReadingGuideStatus("FAILED");
+        ExternalProject rss = new ExternalProject();
+        rss.setId(14L);
+        rss.setSourceType("rss");
+        when(projects.findFeatured()).thenReturn(List.of(missing, failed, rss));
+
+        ProjectReadingGuideQueueService queue = new ProjectReadingGuideQueueService(projects, guides);
+
+        assertThat(queue.enqueueMissingFeatured(5L)).isEqualTo(1);
+        verify(guides).enqueue(12L, 5L, false);
+        verify(guides, never()).enqueue(13L, 5L, false);
+        verify(guides, never()).enqueue(14L, 5L, false);
+    }
+
+    @Test
     void periodicSyncDoesNotAutomaticallyRetryFailedGuide() {
         ExternalProjectMapper projects = mock(ExternalProjectMapper.class);
         ProjectReadingGuideMapper guides = mock(ProjectReadingGuideMapper.class);

@@ -23,7 +23,7 @@ public class ProjectReadingAdminController {
     }
 
     @PostMapping
-    public ApiResponse<ProjectReadingEngineProfileService.ProfileView> save(
+    public ApiResponse<ProjectReadingEngineProfileService.SaveResult> save(
             @RequestBody ProjectReadingEngineProfileService.ProfileInput input, HttpServletRequest request) {
         admin.requireAdmin(request);
         return ApiResponse.success(profiles.save(input));
