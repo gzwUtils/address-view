@@ -64,9 +64,10 @@ public class ProjectService {
     }
 
     public void updateHighlight(Long id, String featuredIntro, String desktopDownloadUrl,
-                                 String desktopVersion, Long accountId) {
+                                 String desktopDownloadUrlX64, String desktopVersion, Long accountId) {
         validateOwnership(id, accountId);
-        int rows = projectMapper.updateHighlight(id, featuredIntro, desktopDownloadUrl, desktopVersion);
+        int rows = projectMapper.updateHighlight(id, featuredIntro, desktopDownloadUrl,
+                desktopDownloadUrlX64, desktopVersion);
         if (rows == 0) {
             throw new IllegalArgumentException("项目不存在: " + id);
         }

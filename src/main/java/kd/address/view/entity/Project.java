@@ -18,6 +18,7 @@ public class Project {
     private String description;
     private String featuredIntro;
     private String desktopDownloadUrl;
+    private String desktopDownloadUrlX64;
     private String desktopVersion;
     private String ownerId;
     private String ownerName;

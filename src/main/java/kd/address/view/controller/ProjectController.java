@@ -41,7 +41,8 @@ public class ProjectController {
         return ApiResponse.success(null);
     }
 
-    public record HighlightRequest(String featuredIntro, String desktopDownloadUrl, String desktopVersion) {}
+    public record HighlightRequest(String featuredIntro, String desktopDownloadUrl,
+                                     String desktopDownloadUrlX64, String desktopVersion) {}
 
     /** 项目所有者更新平台突出介绍与桌面端下载信息。 */
     @PostMapping("/{id}/highlight")
@@ -50,7 +51,7 @@ public class ProjectController {
                                                 HttpServletRequest request) {
         GuestAccount account = identities.requireCurrent(request);
         projectService.updateHighlight(id, body.featuredIntro(), body.desktopDownloadUrl(),
-                body.desktopVersion(), account.getId());
+                body.desktopDownloadUrlX64(), body.desktopVersion(), account.getId());
         return ApiResponse.success(Boolean.TRUE);
     }
 

@@ -8,7 +8,7 @@ import java.util.List;
 @Mapper
 public interface ProjectMapper {
 
-    String PROJECT_COLUMNS = "p.id,p.project_name,p.short_name,p.platform_url,p.background_image,p.category,p.type,p.description,p.featured_intro,p.desktop_download_url,p.desktop_version,p.owner_id,COALESCE(a.nickname,p.owner_name) AS owner_name,p.owner_account_id,p.create_time,p.update_time ";
+    String PROJECT_COLUMNS = "p.id,p.project_name,p.short_name,p.platform_url,p.background_image,p.category,p.type,p.description,p.featured_intro,p.desktop_download_url,p.desktop_download_url_x64,p.desktop_version,p.owner_id,COALESCE(a.nickname,p.owner_name) AS owner_name,p.owner_account_id,p.create_time,p.update_time ";
     String PROJECT_FROM = "FROM project p LEFT JOIN community_account a ON a.id=p.owner_account_id ";
 
     @Select("SELECT " + PROJECT_COLUMNS + PROJECT_FROM + "ORDER BY p.id DESC")
@@ -52,11 +52,13 @@ public interface ProjectMapper {
     void deleteById(@Param("id") Long id);
 
     @Update("UPDATE project SET featured_intro=#{featuredIntro}, " +
-            "desktop_download_url=#{desktopDownloadUrl}, desktop_version=#{desktopVersion}, " +
-            "update_time=NOW() WHERE id=#{id}")
+            "desktop_download_url=#{desktopDownloadUrl}, " +
+            "desktop_download_url_x64=#{desktopDownloadUrlX64}, " +
+            "desktop_version=#{desktopVersion}, update_time=NOW() WHERE id=#{id}")
     int updateHighlight(@Param("id") Long id,
                         @Param("featuredIntro") String featuredIntro,
                         @Param("desktopDownloadUrl") String desktopDownloadUrl,
+                        @Param("desktopDownloadUrlX64") String desktopDownloadUrlX64,
                         @Param("desktopVersion") String desktopVersion);
 
     @Update("UPDATE project SET owner_account_id=#{accountId} WHERE id=#{id} AND owner_account_id IS NULL")
