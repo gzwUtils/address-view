@@ -95,9 +95,17 @@ CREATE TABLE IF NOT EXISTS external_project (
     synced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     display_rank INT NOT NULL,
     featured TINYINT NOT NULL DEFAULT 1,
+    featured_intro TEXT NULL COMMENT '平台自写的突出介绍',
+    desktop_download_url VARCHAR(500) NULL COMMENT '桌面端下载链接',
+    desktop_version VARCHAR(40) NULL COMMENT '桌面端版本号',
     UNIQUE KEY uk_external_source_repo (source_platform, source_repo_id),
     KEY idx_external_featured (featured, display_rank)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='外部开源项目精选';
+
+-- 已有库升级（新库已含上列字段，无需执行）：
+-- ALTER TABLE external_project ADD COLUMN featured_intro TEXT NULL;
+-- ALTER TABLE external_project ADD COLUMN desktop_download_url VARCHAR(500) NULL;
+-- ALTER TABLE external_project ADD COLUMN desktop_version VARCHAR(40) NULL;
 
 -- Configurable, server-side project reading engines. API keys are encrypted by
 -- the application and are never returned to the browser.

@@ -43,6 +43,14 @@ public interface ExternalProjectMapper {
     @Update("UPDATE external_project SET featured = 0 WHERE featured = 1 AND source_platform=#{sourceCode}")
     void clearFeatured(@Param("sourceCode") String sourceCode);
 
+    @Update("UPDATE external_project SET featured_intro=#{featuredIntro}, " +
+            "desktop_download_url=#{desktopDownloadUrl}, desktop_version=#{desktopVersion} " +
+            "WHERE id=#{id}")
+    int updateHighlight(@Param("id") Long id,
+                        @Param("featuredIntro") String featuredIntro,
+                        @Param("desktopDownloadUrl") String desktopDownloadUrl,
+                        @Param("desktopVersion") String desktopVersion);
+
     @Insert("INSERT INTO external_project (source_platform, source_repo_id, full_name, source_url, description, " +
             "language, license_spdx, star_count, fork_count, repo_created_at, synced_at, display_rank, featured) " +
             "VALUES (#{sourcePlatform}, #{sourceRepoId}, #{fullName}, #{sourceUrl}, #{description}, " +

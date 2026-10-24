@@ -22,6 +22,9 @@ public class ExternalProject {
     private LocalDateTime syncedAt;
     private Integer displayRank;
     private Boolean featured;
+    private String featuredIntro;
+    private String desktopDownloadUrl;
+    private String desktopVersion;
     private String readingGuideStatus;
     private LocalDateTime readingGuideUpdatedAt;
     private String readingGuideHook;

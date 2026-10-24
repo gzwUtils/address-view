@@ -30,6 +30,15 @@ public class ExternalProjectService {
         return project;
     }
 
+    public void updateHighlight(Long id, String featuredIntro, String desktopDownloadUrl,
+                                  String desktopVersion) {
+        get(id);
+        int rows = projects.updateHighlight(id, featuredIntro, desktopDownloadUrl, desktopVersion);
+        if (rows == 0) {
+            throw new NotFoundException("站外项目不存在");
+        }
+    }
+
     @Transactional
     public void replaceFeatured(String sourceCode, List<ExternalProject> selected) {
         if (selected == null || selected.isEmpty()) return;
