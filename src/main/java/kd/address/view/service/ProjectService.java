@@ -63,6 +63,15 @@ public class ProjectService {
         }
     }
 
+    public void updateHighlight(Long id, String featuredIntro, String desktopDownloadUrl,
+                                 String desktopVersion, Long accountId) {
+        validateOwnership(id, accountId);
+        int rows = projectMapper.updateHighlight(id, featuredIntro, desktopDownloadUrl, desktopVersion);
+        if (rows == 0) {
+            throw new IllegalArgumentException("项目不存在: " + id);
+        }
+    }
+
     @Transactional
     public void deleteById(Long id, Long accountId) {
         validateOwnership(id, accountId);

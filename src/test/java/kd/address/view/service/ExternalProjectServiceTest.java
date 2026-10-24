@@ -41,5 +41,7 @@ class ExternalProjectServiceTest {
         public ExternalProject findById(Long id) { return null; }
         public void clearFeatured(String sourceCode) { clearCount++; }
         public void upsert(ExternalProject project) { saved.add(project); }
+        public int updateHighlight(Long id, String featuredIntro, String desktopDownloadUrl,
+                                   String desktopVersion) { return 1; }
     }
 }

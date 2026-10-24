@@ -16,6 +16,9 @@ public class Project {
     private String category;
     private String type;
     private String description;
+    private String featuredIntro;
+    private String desktopDownloadUrl;
+    private String desktopVersion;
     private String ownerId;
     private String ownerName;
     private Long ownerAccountId;
